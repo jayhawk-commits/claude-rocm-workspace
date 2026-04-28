@@ -1,6 +1,6 @@
-# ROCm Claude Code Workspace
+# ROCm Claude/Codex Workspace
 
-A meta-workspace for using Claude Code to work on
+A meta-workspace for using Claude Code or Codex to work on
 [ROCm/TheRock](https://github.com/ROCm/TheRock) and related projects. This
 repository serves as a "control center" that provides centralized context,
 tooling, and documentation for AI-assisted development.
@@ -8,10 +8,10 @@ tooling, and documentation for AI-assisted development.
 ## Why a Meta-Workspace?
 
 Build infrastructure work on ROCm involves multiple scattered repositories and
-build directories. Rather than making any single ROCm project the Claude Code
+build directories. Rather than making any single ROCm project the AI assistant
 workspace, this separate meta-repository:
 
-- Provides centralized context and documentation for Claude Code
+- Provides centralized context and documentation for Claude Code and Codex
 - Maps out where all the various directories live (see
   [`directory-map.md`](/directory-map.md))
 - Contains workflows, notes, and helper scripts
@@ -45,6 +45,12 @@ claude-rocm-workspace/
     └── settings.json      # Workspace settings
 ```
 
+Codex-specific additions:
+
+- [`AGENTS.md`](/AGENTS.md) - Repo-local instructions that Codex reads
+- [`scripts/codex.bat`](/scripts/codex.bat) - Codex launcher with the workspace
+  Python environment activated
+
 ## Key Features
 
 ### Code Review System
@@ -59,6 +65,22 @@ The [`reviews/`](/reviews/) directory contains a structured code review system.
 ```
 
 See [`reviews/README.md`](/reviews/README.md) for full documentation.
+
+### Codex Support
+
+Codex reads [`AGENTS.md`](/AGENTS.md) automatically when working in this repo.
+That file points Codex at the same task and review system while translating
+Claude-specific pieces, such as slash commands and subagent notes, into Codex's
+workflow.
+
+Codex does not execute the Claude slash commands directly. Use natural-language
+requests instead:
+
+```text
+Review PR https://github.com/ROCm/TheRock/pull/1234
+Review my current branch with focus on tests and CI
+Switch to task multi-arch-prebuilt
+```
 
 ### Task Management
 
@@ -99,21 +121,21 @@ Available commands in [`.claude/commands/`](/.claude/commands/):
 
 1. Clone this repository
 2. Update `directory-map.md` with your actual directory paths
-3. Customize `CLAUDE.md` with your project-specific context
+3. Customize `CLAUDE.md` and `AGENTS.md` with your project-specific context
 4. Set up the Python environment (see below)
-5. Run Claude Code using the launcher script
+5. Run Claude Code or Codex using the launcher script
 
 ### Python Environment
 
 A Python virtual environment ensures tools like `pytest` are available when
-Claude runs commands.
+Claude or Codex runs commands.
 
 **One-time setup (Windows):**
 ```powershell
-cd D:\projects\claude-rocm-workspace
+cd C:\Dev\claude-rocm-workspace
 py -V:3.12 -m venv 3.12.venv
 .\3.12.venv\Scripts\activate.bat
-pip install -r ..\TheRock\requirements.txt
+pip install -r ..\TheRock-pub\requirements.txt
 ```
 
 **Launching Claude:**
@@ -121,15 +143,20 @@ pip install -r ..\TheRock\requirements.txt
 .\scripts\claude.bat
 ```
 
-The launcher script activates the venv before starting Claude, so Python tools
-are available in the session.
+**Launching Codex:**
+```powershell
+.\scripts\codex.bat
+```
+
+The launcher scripts activate the venv before starting the assistant, so Python
+tools are available in the session.
 
 ## Adapting for Your Project
 
 This workspace pattern can be adapted for any multi-repository project:
 
 1. Fork this repository
-2. Replace ROCm-specific content in `CLAUDE.md`
+2. Replace ROCm-specific content in `CLAUDE.md` and `AGENTS.md`
 3. Update `directory-map.md` for your environment
 4. Customize the review guidelines for your project's conventions
 5. Add task templates relevant to your work
