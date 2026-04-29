@@ -13,6 +13,17 @@ Project repository: https://github.com/ROCm/TheRock
 This is a meta-workspace. Actual source and build directories are scattered
 across the filesystem and referenced by absolute paths.
 
+Private/NPI repositories and source trees may be present beside the public
+workspaces. It is OK to use those local files as task context when needed, but
+do not leak NPI-only source, identifiers, private workspace paths or aliases,
+internal branch names, non-public links or logs, or implementation details into
+user-facing output, review files, commits, PRs, or other artifacts that may be
+shared. Workspace-local inventory files may record local aliases or paths for
+navigation. Public repository paths/worktrees are not NPI by themselves and may
+be recorded when useful; prefer repository-relative paths in shareable artifacts
+for portability. Summarize privately-derived findings at a sanitized level and
+cite public equivalents when possible.
+
 **Important:** Use relative paths when editing files.
 
 For example:

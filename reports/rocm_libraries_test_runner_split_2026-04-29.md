@@ -16,11 +16,16 @@ This follows the design direction from TheRock PR 4581 review feedback:
 - Keep runner scripts directly executable, with a `main()` entry point and
   simple subprocess execution.
 
-## First Prepared Slice
+## Prepared Branches
 
 | Area | Branch | Commit | Status | Main files |
 | --- | --- | --- | --- | --- |
 | rand | `users/jayhawk-commits/install-rand-test-runners` | `f5d2adbbab` | Local only; not pushed | `projects/hiprand/test/run_hiprand.py`, `projects/rocrand/test/run_rocrand.py`; removes the old rand copies from `test/therock` |
+| fft | `users/jayhawk-commits/install-fft-test-runners` | `be34e801a0` | Local only; not pushed | `projects/hipfft/clients/tests/run_hipfft.py`, `projects/rocfft/clients/tests/run_rocfft.py`; removes the old fft copies from `test/therock` |
+| prim | `users/jayhawk-commits/install-prim-test-runners` | `913a536520` | Local only; not pushed | `projects/hipcub/test/run_hipcub.py`, `projects/rocprim/test/run_rocprim.py`, `projects/rocthrust/test/run_rocthrust.py`; removes the old prim copies from `test/therock` |
+| solver | `users/jayhawk-commits/install-solver-test-runners` | `68b7ba0a76` | Local only; not pushed | `projects/hipsolver/clients/gtest/run_hipsolver.py`, `projects/rocsolver/clients/gtest/run_rocsolver.py`; removes the old solver copies from `test/therock` |
+| sparse | `users/jayhawk-commits/install-sparse-test-runners` | `2a51a357bc` | Local only; not pushed | `projects/hipsparse/clients/tests/run_hipsparse.py`, `projects/hipsparselt/clients/gtest/run_hipsparselt.py`, `projects/rocsparse/clients/tests/run_rocsparse.py`; removes the old sparse copies from `test/therock` |
+| rocwmma | `users/jayhawk-commits/install-rocwmma-test-runner` | `6414445d54` | Local only; not pushed | `projects/rocwmma/test/run_rocwmma.py`; removes the old rocWMMA copy from `test/therock` |
 
 The rand slice was chosen first because both runners are simple CTest wrappers
 and both projects already install a `CTestTestfile.cmake` under
@@ -42,14 +47,9 @@ and both projects already install a `CTestTestfile.cmake` under
 
 | Area | Candidate scripts | Notes |
 | --- | --- | --- |
-| prim | `test_hipcub.py`, `test_rocprim.py`, `test_rocthrust.py` | Likely a good next batch; all are project-owned tests in the prim area. |
-| fft | `test_hipfft.py`, `test_rocfft.py` | Small CTest-style wrappers; likely similar to rand. |
-| solver | `test_hipsolver.py`, `test_rocsolver.py` | Keep as a separate slice because solver installs and clients may differ. |
-| sparse | `test_hipsparse.py`, `test_rocsparse.py`, `test_hipsparselt.py` | Split `hipsparselt` separately if its install/test layout differs from the other sparse projects. |
 | blas | `test_hipblas.py`, `test_hipblaslt.py`, `test_hipblasltprovider.py`, `test_rocblas.py`, `test_rocroller.py`, `test_runner.py` | Larger and less uniform; likely needs more careful per-project review. |
 | miopen | `test_miopen.py`, `test_miopenprovider.py` | `test_miopen.py` is one of the larger scripts and should be handled separately. |
 | hipdnn and providers | `test_hipdnn.py`, `test_hipdnn_install.py`, `test_hipdnn_samples.py`, `test_hipkernelprovider.py` | Provider layout spans `projects/hipdnn` and `dnn-providers`; handle deliberately. |
-| rocwmma | `test_rocwmma.py` | Can likely stand alone. |
 
 `test_fusilliprovider.py` and `test_hipdnn_integration_tests.py` exist in the
 current TheRock test script set but were not present in the rocm-libraries
@@ -58,10 +58,10 @@ considered when splitting the provider/integration-test area.
 
 ## Validation Performed
 
-For the rand branch:
+For the prepared branches:
 
-- `python -m py_compile projects/hiprand/test/run_hiprand.py projects/rocrand/test/run_rocrand.py`
-- `git diff --check origin/develop...HEAD`
+- `python -m py_compile` was run for each new runner script.
+- `git diff --check` was run before each commit.
 
 Full hardware/package validation was not run locally. These runners need ROCm
 install artifacts and suitable GPU hardware to exercise the actual test suites.
@@ -69,5 +69,26 @@ install artifacts and suitable GPU hardware to exercise the actual test suites.
 ## Current Worktree
 
 - `C:\Dev\rocm-libs-rand-runners`
+- `C:\Dev\rocm-libs-fft-runners`
+- `C:\Dev\rocm-libs-prim-runners`
+- `C:\Dev\rocm-libs-solver-runners`
+- `C:\Dev\rocm-libs-sparse-runners`
+- `C:\Dev\rocm-libs-rocwmma-runner`
 
-The branch is local only at the time of this note. No push or PR was created.
+The branches are local only at the time of this note. No push or PR was created.
+
+## Next Actions
+
+1. Re-check each prepared rocm-libraries branch against current `origin/develop`
+   before pushing. At least `install-rocwmma-test-runner` reported one commit
+   behind its upstream tracking branch after the local commit.
+2. Push the prepared rocm-libraries branches and open draft PRs only after
+   explicit approval.
+3. Continue the split with the remaining larger buckets: BLAS, MIOpen, and
+   hipDNN/providers.
+4. For the provider/integration-test area, include the newer TheRock-only
+   scripts (`test_fusilliprovider.py` and `test_hipdnn_integration_tests.py`) in
+   the ownership review even though they were not in the older rocm-libraries
+   `test/therock` copy set.
+5. After rocm-libraries PRs are prepared, revisit TheRock PR 4581 and simplify
+   the TheRock-side design around project-owned installed runners.

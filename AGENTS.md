@@ -18,6 +18,16 @@ ROCm and review-system knowledge, but adapt Claude-specific mechanics to Codex:
 
 ## Workspace Rules
 
+- Treat private/NPI repositories, source trees, logs, branches, paths, aliases,
+  and identifiers as confidential context. It is OK to inspect and use them
+  inside this local workspace when they are relevant to the task, and workspace-
+  local inventory files may record local aliases or paths for navigation. Do
+  not quote, copy, or disclose NPI-only source, private workspace paths or
+  aliases, internal branch names, non-public links or logs, or implementation
+  details in user-facing output, review files, commits, PRs, or public
+  artifacts. Public repository paths/worktrees are not NPI by themselves and may
+  be recorded when useful; prefer repository-relative paths in shareable
+  artifacts for portability.
 - Check the active repository with `git status --short` before editing.
 - Never revert, reset, amend, push, or force-push unless the user explicitly
   asks for that operation.

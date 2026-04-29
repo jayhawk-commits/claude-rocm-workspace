@@ -45,7 +45,7 @@ Each branch follows the same basic pattern:
 | aqlprofile | `users/jayhawk-commits/install-aqlprofile-test-runner` | `51731c2636` | Draft PR #5597 | `projects/aqlprofile/test/run_aqlprofile.py`; deletes `test/therock/test_aqlprofile.py` |
 | rocdecode | `users/jayhawk-commits/install-rocdecode-test-runner` | `4f2f3d9dcd` | Draft PR #5598 | `projects/rocdecode/test/run_rocdecode.py`; moves `test/therock/test_rocdecode.py` |
 | rocjpeg | `users/jayhawk-commits/install-rocjpeg-test-runner` | `467f52e94c` | Draft PR #5599 | `projects/rocjpeg/test/run_rocjpeg.py`; moves `test/therock/test_rocjpeg.py` |
-| hip-tests | `users/jayhawk-commits/install-hiptests-test-runner` | `eddec72f3c` | Draft PR #5600 | `projects/hip-tests/catch/run_hiptests.py`; deletes `test/therock/test_hiptests.py` |
+| hip-tests | `users/jayhawk-commits/install-hiptests-test-runner` | `622f697c9d` | Draft PR #5600 | `projects/hip-tests/catch/packaging/run_hiptests.py`; deletes `test/therock/test_hiptests.py` |
 | amdsmi | `users/jayhawk-commits/install-amdsmi-test-runner` | `d0f8a76704` | Draft PR #5601 | `projects/amdsmi/tests/amd_smi_test/run_amdsmi.py`; deletes `test/therock/test_amdsmi.py` |
 | rocprofiler-systems | `users/jayhawk-commits/install-rocprofiler-systems-test-runner` | `d7e15d4dfe` | Draft PR #5602 | `projects/rocprofiler-systems/tests/run_rocprofiler_systems.py`; deletes `test/therock/test_rocprofiler_systems.py` |
 | rocr-debug-agent | `users/jayhawk-commits/install-rocr-debug-agent-test-runner` | `a13010eb10` | Draft PR #5603 | `projects/rocr-debug-agent/test/run_rocr_debug_agent.py`; moves `test/therock/test_rocr-debug-agent.py` |
@@ -70,6 +70,11 @@ Each branch follows the same basic pattern:
   example and TheRock Python style guidance: executable shebangs, no stale
   TheRock path wording, no helper-level `sys.exit()`, modern type syntax, and a
   fixed RCCL default GPU selection of `0,1` instead of `2,3`.
+- The hip-tests branch was updated again after CI showed that
+  `catch/packaging/CMakeLists.txt` tried to install
+  `catch/packaging/run_hiptests.py`. The runner now lives beside that install
+  logic at `catch/packaging/run_hiptests.py`, keeping the install rule as
+  `${CMAKE_CURRENT_SOURCE_DIR}/run_hiptests.py`.
 
 ## Validation Performed
 
