@@ -186,6 +186,123 @@ Mandatory controls:
 - Log retrieval + response trace for audits
 - Redact PII where required
 
+## 9.1) Identity and Credential Model (Non-Personal Accounts)
+Principle: no personal accounts or personal API tokens in production paths.
+
+Required service identities:
+- `sp-teams-ingest-prod`: Azure AD app/service principal for Microsoft Graph ingestion (read only)
+- `sp-teams-bot-prod`: Azure Bot identity for Teams draft posting workflow
+- `svc-confluence-rag-prod`: dedicated Confluence technical account (read only, approved spaces only)
+- `gha-rag-reader-prod`: GitHub App (preferred) with read-only repo docs access
+- `sp-rag-runtime-prod`: backend runtime identity for retrieval, LLM calls, and storage access
+
+Environment separation:
+- Separate identities per environment (`dev`, `test`, `prod`)
+- No shared credentials between environments
+- Prod credentials only usable from prod runtime
+
+Credential standards:
+- Prefer workload identity/managed identity over static secrets where possible
+- If secrets are required, store only in enterprise secrets manager
+- Enforce key/token rotation (for example every 90 days or stricter org policy)
+- Break-glass credentials must be separate, time-bound, and fully audited
+
+## 9.2) Minimum Permission Scope Matrix (Least Privilege)
+Microsoft Teams / Graph:
+- Read channel messages and replies only for approved team/channel IDs
+- No mailbox access
+- No write permission for ingestion principal
+- Bot principal allowed to post drafts only in approved channel/thread context
+
+Confluence:
+- Read-only access to allowlisted spaces
+- No edit, comment, or admin permissions
+- Optional label-based page include/exclude policy for sensitive content
+
+GitHub:
+- GitHub App with read-only `Contents` and optionally `Metadata`
+- Install only on allowlisted repositories
+- No code write, no PR write, no admin scopes
+
+Storage and indexes:
+- Runtime principal can read/write only required storage containers and index resources
+- Human users have no direct write path to vector/keyword index in production
+- Deny-by-default network policy between services
+
+LLM endpoint:
+- Service principal/project-scoped API credential only
+- Disable training on submitted enterprise data if provider offers that control
+- Region and data-processing settings must match compliance requirements
+
+## 9.3) Secrets Management and Key Rotation
+Controls:
+- All secrets in vault (for example Azure Key Vault)
+- No secrets in source control, `.env` files, or pipeline logs
+- Secret retrieval at runtime via managed identity
+- Access to secret values restricted to runtime identities only
+
+Rotation and lifecycle:
+- Automated rotation where supported
+- Manual rotation runbook for unsupported credentials
+- Immediate rotation on suspected exposure
+- Deprovision credentials immediately when connector is removed
+
+## 9.4) Data Classification, Retention, and Privacy
+Classification expectations:
+- Teams/Confluence/GitHub data treated as internal by default
+- Explicit denylist for restricted categories (credentials, regulated PII, legal hold material unless approved)
+
+Retention:
+- Raw ingested payload retention window (example: 30-90 days) per policy
+- Derived chunks/embeddings retention aligned to source lifecycle
+- Hard delete propagation when source content is deleted or access revoked
+
+Privacy:
+- PII minimization before indexing where practical
+- Redaction pipeline for common sensitive patterns
+- Do not include personal profile enrichment beyond source metadata needed for traceability
+
+## 9.5) Audit Logging and Monitoring Requirements
+Log events (immutable where possible):
+- Authentication events for all service identities
+- Ingestion job runs: source, object count, failures
+- Retrieval traces: query ID, chunk IDs, source links, confidence, escalation decision
+- Human review decisions: approved/edited/rejected and timestamp
+- Administrative changes: scope updates, policy updates, connector enable/disable
+
+Monitoring and alerts:
+- Alert on unusual access patterns (spikes, off-hours, denied ACL attempts)
+- Alert on secret read anomalies and repeated auth failures
+- Alert on low-citation or no-citation response attempts
+- Weekly access review report for InfoSec and system owner
+
+## 9.6) Threat Model Summary and Mitigations
+Threat: data leakage across channels/spaces/repos
+- Mitigation: query-time ACL enforcement + integration tests with negative cases
+
+Threat: prompt injection from source documents
+- Mitigation: retrieval sanitizer, instruction hierarchy, and tool-use restrictions
+
+Threat: hallucinated or unsafe guidance
+- Mitigation: citation-required output, confidence gating, human approval in MVP
+
+Threat: secret exposure from repos/docs
+- Mitigation: pre-index secret scanning + blocklist filters + incident response runbook
+
+Threat: over-privileged service principals
+- Mitigation: least-privilege scope reviews and quarterly recertification
+
+## 9.7) InfoSec Approval Evidence Checklist
+Provide this package for approval:
+- Data flow diagram with trust boundaries and egress points
+- Identity inventory with owner, purpose, scopes, and rotation policy
+- Permission screenshots/exports for Graph, Confluence, GitHub, vault, and storage
+- Threat model and control mapping
+- Retention/deletion policy and validation test evidence
+- Audit log sample showing end-to-end traceability from question to response
+- Incident response playbook (credential leak, bad response, unauthorized access)
+- Pilot go-live risk acceptance signed by system owner and InfoSec
+
 ## 10) Implementation Plan (6 Weeks)
 Week 1: Foundations
 - Create app registrations/service principals
@@ -269,3 +386,124 @@ Start with a design review meeting using this document, then lock:
 2. Source priority policy
 3. Escalation policy
 4. Success metrics for a 2-4 week pilot
+
+## 16) InfoSec Control Mapping (For Security Intake)
+Use this section to map design controls to common security review domains.
+
+### 16.1) IAM and Access Control
+Objectives:
+- Enforce least privilege
+- Prevent use of personal credentials
+- Ensure access is auditable and reviewable
+
+Implemented controls:
+- Dedicated service identities per system and per environment (Section 9.1)
+- Scope-limited permissions for Graph, Confluence, and GitHub (Section 9.2)
+- Query-time ACL enforcement on every retrieval request (Sections 5, 9)
+- Quarterly access recertification for service principals and app installs (Section 9.6)
+
+Evidence:
+- Identity inventory with owners and scope exports
+- Access review records and approval history
+
+### 16.2) Data Protection and Privacy
+Objectives:
+- Protect internal and sensitive data
+- Minimize unnecessary retention
+- Support deletion and revocation requirements
+
+Implemented controls:
+- Data classification defaults and restricted-content denylist (Section 9.4)
+- PII minimization/redaction before indexing (Sections 9, 9.4)
+- Retention windows for raw and derived data (Section 9.4)
+- Delete propagation when source content is removed or permissions change (Section 9.4)
+
+Evidence:
+- Retention policy configuration
+- Redaction/filter test results
+- Deletion propagation test logs
+
+### 16.3) Application Security (AppSec)
+Objectives:
+- Prevent unsafe model behavior and injection abuse
+- Reduce hallucinations and unsafe automation decisions
+
+Implemented controls:
+- Citation-required answer policy (Sections 7, 8)
+- Confidence gating and mandatory human approval in MVP (Sections 8, 8.1)
+- Prompt injection mitigation via retrieval sanitization and instruction hierarchy (Section 9.6)
+- Secrets scanning and filtering before indexing (Sections 9, 9.6)
+
+Evidence:
+- Prompt/policy configuration
+- Red-team or abuse-case test results
+- Sample traces showing escalation on low confidence
+
+### 16.4) Logging, Monitoring, and Detection
+Objectives:
+- Ensure full traceability
+- Detect abuse, drift, and anomalous access quickly
+
+Implemented controls:
+- End-to-end audit logs for auth, ingestion, retrieval, and reviewer actions (Section 9.5)
+- Alerts for ACL denials, auth failures, anomalous access, and no-citation attempts (Section 9.5)
+- Weekly governance reporting to owner and InfoSec (Section 9.5)
+
+Evidence:
+- SIEM dashboard screenshots/queries
+- Alert routing and on-call ownership
+- Weekly report artifacts
+
+### 16.5) Incident Response and Recovery
+Objectives:
+- Respond quickly to leaks, misconfigurations, or harmful responses
+- Restore secure operations with minimal downtime
+
+Implemented controls:
+- Credential rotation and emergency revocation runbooks (Section 9.3)
+- Playbooks for unauthorized access and bad-response incidents (Section 9.7)
+- Human escalation path for sensitive/high-risk requests (Sections 8, 8.1)
+
+Evidence:
+- Incident runbooks
+- Tabletop exercise notes
+- Mean-time-to-revoke and mean-time-to-contain metrics
+
+### 16.6) Third-Party and Vendor Risk
+Objectives:
+- Manage risk from external platforms and model providers
+- Ensure contractual and technical controls are aligned
+
+Implemented controls:
+- Approved enterprise endpoints only for LLM and storage (Sections 11, 9.2)
+- Provider data-handling controls aligned to org policy (Section 9.2)
+- Scoped GitHub App installation and constrained Confluence space access (Section 9.2)
+
+Evidence:
+- Vendor security review references
+- Contractual data-processing terms
+- Architecture diagram showing external dependencies
+
+### 16.7) Change Management and Governance
+Objectives:
+- Control production changes
+- Ensure clear accountability for risk decisions
+
+Implemented controls:
+- Phased rollout with pilot gating and go/no-go checkpoints (Section 10)
+- Security review and API scope approval prerequisites (Section 14)
+- Explicit ownership and SLA for human fallback (Section 14)
+
+Evidence:
+- CAB/change tickets
+- Approval records for prod promotion
+- Post-pilot risk acceptance sign-off
+
+### 16.8) Security Sign-Off Template
+Use this checklist in the approval ticket:
+- IAM owner approved service identities and scopes
+- InfoSec approved data classification, retention, and deletion controls
+- AppSec approved prompt safety and injection mitigations
+- SOC/Monitoring approved logging coverage and alert routing
+- Incident Response owner approved playbooks and escalation paths
+- System owner accepted residual pilot risk and go-live conditions
