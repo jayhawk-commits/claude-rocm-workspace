@@ -26,6 +26,11 @@ ROCm and review-system knowledge, but adapt Claude-specific mechanics to Codex:
 - Use `rg`/`rg --files` for searches.
 - Use `git -C <path>` when operating on sibling ROCm repositories from this
   meta-workspace.
+- Run Git operations sequentially. Do not use parallel tool calls for `git`
+  staging, committing, worktree, fetch, push, or PR-related commands, even when
+  they target different worktrees. On this Windows sandbox, parallel Git can
+  collide on locks or abort with pipe/signal errors and make progress look
+  stalled.
 - Avoid long ROCm builds unless the user asks for them or confirms the scope.
   Configure and inspect first; build the smallest useful target.
 
