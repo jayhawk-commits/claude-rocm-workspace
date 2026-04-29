@@ -143,6 +143,13 @@ py -V:3.12 -m venv 3.12.venv
 pip install -r ..\TheRock-pub\requirements.txt
 ```
 
+If the Windows Store `python` alias or the `py` launcher is unavailable in the
+sandbox, use a workspace-local Python install instead:
+
+```powershell
+.\scripts\setup-python.ps1
+```
+
 **Launching Claude:**
 ```powershell
 .\scripts\claude.bat

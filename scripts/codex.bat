@@ -4,6 +4,8 @@ REM
 REM Setup (one-time):
 REM   cd C:\Dev\claude-rocm-workspace
 REM   py -V:3.12 -m venv 3.12.venv
+REM   REM If the py launcher is unavailable, use a local Python instead:
+REM   REM C:\Dev\python-3.12.13\python.exe -m venv 3.12.venv
 REM   .\3.12.venv\Scripts\activate.bat
 REM   pip install -r ..\TheRock-pub\requirements.txt
 REM
@@ -14,6 +16,11 @@ setlocal
 set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "WORKSPACE_DIR=%%~fI"
 set "VENV_ACTIVATE=%WORKSPACE_DIR%\3.12.venv\Scripts\activate.bat"
+set "WORKSPACE_TMP=C:\Dev\tmp"
+
+if not exist "%WORKSPACE_TMP%" mkdir "%WORKSPACE_TMP%"
+set "TEMP=%WORKSPACE_TMP%"
+set "TMP=%WORKSPACE_TMP%"
 
 if exist "%VENV_ACTIVATE%" (
   call "%VENV_ACTIVATE%"
