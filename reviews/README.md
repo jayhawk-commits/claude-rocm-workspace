@@ -150,6 +150,14 @@ reviews/
 
 ---
 
+### Reference Reviews
+
+Older review notes inherited from the source workspace live under
+`reviews/reference/inherited/`. They are kept for search and examples, but they
+are not active review work produced in this workspace.
+
+---
+
 ## Documentation Files
 
 - **[README.md](README.md)** - This quick start guide

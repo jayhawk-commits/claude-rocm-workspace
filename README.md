@@ -66,6 +66,11 @@ The [`reviews/`](/reviews/) directory contains a structured code review system.
 
 See [`reviews/README.md`](/reviews/README.md) for full documentation.
 
+Inherited review notes from the source workspace are kept under
+[`reviews/reference/inherited/`](/reviews/reference/inherited/). They remain
+available as reference material, but are separated from review work produced in
+this workspace.
+
 ### Codex Support
 
 Codex reads [`AGENTS.md`](/AGENTS.md) automatically when working in this repo.
