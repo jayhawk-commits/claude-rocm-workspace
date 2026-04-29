@@ -26,31 +26,70 @@ artifacts under `share/therock-scripts`, then switches the `hip-tests` and
 
 ## Overall Assessment
 
-**CONDITIONALLY APPROVED: merge after the `rocm-systems` submodule pointer
-includes ROCm/rocm-systems#5541.**
+**DESIGN RECONSIDERATION REQUESTED.**
 
 The CMake-side blocker from the first review has been fixed by
 `2b13e4ea` (`fix(ci): track packaged test script inputs`). Packaged script
 files are now part of subproject fingerprints, CMake configure dependencies,
 and stage install dependencies.
 
-The remaining merge precondition is the selected `rocm-systems` source revision
-for the packaged `rocrtst` script. The script fix has now merged in
-ROCm/rocm-systems#5541, but PR 4581 still points at an older `rocm-systems`
-submodule revision. If this PR merges before TheRock advances that submodule to
-include rocm-systems merge commit `06d2a72ad3`, it will still package the
-broken `test_rocrtst.py`.
+A new design-level review asks whether this should be implemented in
+`cmake/therock_subproject.cmake` at all. The concern is that the PR makes
+TheRock install test scripts on behalf of subprojects, using TheRock-specific
+paths and a new `INSTALL_TEST_SCRIPT_FILES` hook. The requested alternative is
+for subprojects to install their own test scripts by convention, then for
+CI/artifact packaging to consume those installed files.
 
-This does **not** require TheRock-local test script edits in PR 4581. The clean
-resolution is to merge only after TheRock's `rocm-systems` submodule pointer
-includes ROCm/rocm-systems#5541, whether by a separate submodule update or by a
-regular submodule roll-forward.
+My previous conditional approval is therefore superseded. The correctness fixes
+are in reasonable shape, but the architectural question should be resolved with
+the reviewer before merge.
 
 ---
 
-## Current Merge Precondition
+## Current Design Review Concern
 
-### 1. Packaged `rocrtst` script source is still stale in TheRock
+### 1. Superproject-installed test scripts may be the wrong ownership boundary
+
+**DESIGN ISSUE: A new review asks to move script installation into the
+subprojects themselves instead of extending `therock_subproject.cmake`.**
+
+ScottTodd's review comment on `cmake/therock_subproject.cmake` asks why any
+changes to that file are needed and suggests a different model:
+
+https://github.com/ROCm/TheRock/pull/4581#discussion_r3156315893
+
+Paraphrased concern:
+
+- Subprojects should install their test scripts under a normal install-tree
+  convention, for example `share/tests/`.
+- The CI system should look for installed test scripts there.
+- The subprojects should not need to know or care that TheRock is the
+  superproject building them.
+- Standalone subproject builds should install runnable test scripts too.
+- A narrow `INSTALL_TEST_SCRIPT_FILES` hook could grow into a general
+  superproject-managed side-channel for tests, benchmarks, dependencies, or
+  other files.
+
+This is a design objection, not just a naming nit. The current PR adds
+TheRock-specific script installation behavior to the superproject wrapper, and
+the reviewer is asking whether that whole ownership model should be inverted.
+
+**Likely resolution paths:**
+
+1. Rework the design so `rocm-systems` subprojects install their own test
+   scripts into a conventional test-script location. TheRock would then only
+   include those installed files in artifacts and point CI at them.
+2. Keep the current design only if the reviewer agrees that this is an
+   intentional transitional mechanism for RFC0010 and that standalone
+   subproject installation is a follow-up.
+
+Given the review wording, option 1 is probably the safer long-term direction.
+
+---
+
+## Remaining Merge Precondition If Current Design Continues
+
+### 2. Packaged `rocrtst` script source is still stale in TheRock
 
 **MERGE PRECONDITION: Merging with the current submodule pointer would still
 package a `rocrtst` script that can fail for unlisted AMDGPU families.**
@@ -90,16 +129,18 @@ At the stale revisions, `test_rocrtst.py` only initializes
 That still raises `NameError` for families not present in `TEST_TO_IGNORE`, such
 as `gfx120X-all`.
 
-**Required before merge:** Ensure TheRock's `rocm-systems` submodule
-pointer includes ROCm/rocm-systems#5541 (`06d2a72ad3` or later). This can happen
-outside PR 4581; the important part is that 4581 should not merge while
-packaging the older script.
+**Required before merge if this design continues:** Ensure TheRock's
+`rocm-systems` submodule pointer includes ROCm/rocm-systems#5541
+(`06d2a72ad3` or later). This can happen outside PR 4581; the important part is
+that 4581 should not merge while packaging the older script. If the design is
+reworked so subprojects install their own scripts, this precondition still
+applies to whatever `rocm-systems` revision supplies the installed script.
 
 ---
 
 ## Resolved Issue
 
-### 2. Packaged script contents now participate in rebuild/fingerprint inputs
+### 3. Packaged script contents now participate in rebuild/fingerprint inputs
 
 **RESOLVED by `2b13e4ea`.**
 
@@ -114,7 +155,7 @@ The current PR head fixes that by:
 - adding the files to `CMAKE_CONFIGURE_DEPENDS`;
 - adding the files to the stage install custom command `DEPENDS`.
 
-That addresses the stale artifact/rebuild concern.
+That addresses the stale artifact/rebuild concern for the current design.
 
 ---
 
@@ -131,20 +172,24 @@ That addresses the stale artifact/rebuild concern.
 
 ## Recommendation
 
-Keep PR 4581 limited to packaging mechanics. Do not add TheRock-local test
-script edits just to work around the stale packaged source.
+Pause merge and respond to the design review first.
 
-Before merge, ensure TheRock is using a `rocm-systems` submodule revision that
-contains ROCm/rocm-systems#5541. Once that is true and CI is green, I do not see
-another legitimate blocker in the current PR diff.
+The cleanest path is likely to move test-script installation responsibility into
+the owning subprojects, then simplify the TheRock PR so it consumes installed
+test scripts rather than installing source files from the superproject wrapper.
+Do not add TheRock-local test script edits just to work around the stale
+packaged source.
+
+If the current design is kept after discussion, ensure TheRock is using a
+`rocm-systems` submodule revision that contains ROCm/rocm-systems#5541 before
+merge.
 
 ---
 
 ## Conclusion
 
-**Approval Status: CONDITIONALLY APPROVED once the packaged `rocrtst` source
-revision includes the merged rocm-systems fix.**
+**Approval Status: DESIGN RECONSIDERATION REQUESTED.**
 
-The earlier CMake/fingerprint blocker is resolved. The remaining concern is a
-real merge precondition, but it should be satisfied by a submodule update rather
-than by widening PR 4581.
+The earlier CMake/fingerprint blocker is resolved, and the `rocrtst` script fix
+exists in rocm-systems. The new review raises a broader ownership/design concern
+that should be settled before treating PR 4581 as merge-ready.
