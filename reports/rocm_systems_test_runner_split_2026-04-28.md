@@ -48,7 +48,7 @@ Each branch follows the same basic pattern:
 | hip-tests | `users/jayhawk-commits/install-hiptests-test-runner` | `74611122b6` | PR #5600 updated on 2026-04-30 | `projects/hip-tests/catch/packaging/run_hiptests.py`; deletes `test/therock/test_hiptests.py` |
 | amdsmi | `users/jayhawk-commits/install-amdsmi-test-runner` | `b57aa0a2c6` | PR #5601 updated on 2026-04-30 | `projects/amdsmi/tests/amd_smi_test/run_amdsmi.py`; deletes `test/therock/test_amdsmi.py` |
 | rocprofiler-systems | `users/jayhawk-commits/install-rocprofiler-systems-test-runner` | `93c7b17501` | PR #5602 updated on 2026-04-30 | `projects/rocprofiler-systems/tests/run_rocprofiler_systems.py`; deletes `test/therock/test_rocprofiler_systems.py` |
-| rocr-debug-agent | `users/jayhawk-commits/install-rocr-debug-agent-test-runner` | `dc178a87f9` | Branch updated on 2026-04-30; PR #5603 is closed | `projects/rocr-debug-agent/test/run_rocr_debug_agent.py`; moves `test/therock/test_rocr-debug-agent.py` |
+| rocr-debug-agent | `users/jayhawk-commits/install-rocr-debug-agent-test-runner` | `dc178a87f9` | Branch updated on 2026-04-30; PR #5603 is closed and superseded | `projects/rocr-debug-agent/test/run_rocr_debug_agent.py`; moves `test/therock/test_rocr-debug-agent.py` |
 | rocprofiler-compute | `users/jayhawk-commits/install-rocprofiler-compute-test-runner` | `c5c2f002e5` | PR #5604 updated on 2026-04-30 | `projects/rocprofiler-compute/tests/run_rocprofiler_compute.py`; deletes `test/therock/test_rocprofiler_compute.py` |
 | rocprofiler-sdk | `users/jayhawk-commits/install-rocprofiler-sdk-test-runner` | `3f655777b1` | PR #5605 updated on 2026-04-30 | `projects/rocprofiler-sdk/tests/run_rocprofiler_sdk.py`; deletes `test/therock/test_rocprofiler_sdk.py` |
 | rccl | `users/jayhawk-commits/install-rccl-test-runner` | `dc66b6fec6` | PR #5606 updated on 2026-04-30 | `projects/rccl/test/run_rccl.py`; deletes `test/therock/test_rccl.py` |
@@ -81,8 +81,8 @@ Each branch follows the same basic pattern:
   avoids direct `lib` assumptions where `lib64` may be used, fixes gtest filter
   construction, and uses Python-compatible typing syntax in new runner scripts.
   These commits were pushed to the rocm-systems branches on 2026-04-30. PR
-  #5603 had already been closed, so its branch was updated but the PR remains
-  closed.
+  #5603 had already been closed and superseded, so its branch was updated but
+  the PR remains closed.
 
 ## Validation Performed
 
@@ -121,7 +121,6 @@ All runner worktrees are under `C:\Dev`:
    likely to accept.
 2. Promote draft PRs to ready-for-review after any desired local/package
    validation.
-3. Decide whether closed PR #5603 should stay closed or be reopened/recreated
-   with the pushed branch update.
+3. Keep PR #5603 closed; rocr-debug-agent is covered by a superseding PR.
 4. After the rocm-systems PRs land, revisit TheRock PR 4581 and remove the
    copied-script install design.
