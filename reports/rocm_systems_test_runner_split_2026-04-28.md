@@ -1,7 +1,7 @@
 # rocm-systems Test Runner Split
 
 Date: 2026-04-28
-Updated: 2026-04-29
+Updated: 2026-04-30
 
 ## Context
 
@@ -41,18 +41,18 @@ Each branch follows the same basic pattern:
 
 | Project | Branch | Commit | PR status | Main files |
 | --- | --- | --- | --- | --- |
-| rocr-runtime / rocrtst | `users/jayhawk-commits/install-rocrtst-test-runner` | `f7eae2e5b0` | Draft PR #5552 | `projects/rocr-runtime/rocrtst/suites/test_common/run_rocrtst.py`; deletes `test/therock/test_rocrtst.py` |
-| aqlprofile | `users/jayhawk-commits/install-aqlprofile-test-runner` | `51731c2636` | Draft PR #5597 | `projects/aqlprofile/test/run_aqlprofile.py`; deletes `test/therock/test_aqlprofile.py` |
-| rocdecode | `users/jayhawk-commits/install-rocdecode-test-runner` | `4f2f3d9dcd` | Draft PR #5598 | `projects/rocdecode/test/run_rocdecode.py`; moves `test/therock/test_rocdecode.py` |
-| rocjpeg | `users/jayhawk-commits/install-rocjpeg-test-runner` | `467f52e94c` | Draft PR #5599 | `projects/rocjpeg/test/run_rocjpeg.py`; moves `test/therock/test_rocjpeg.py` |
-| hip-tests | `users/jayhawk-commits/install-hiptests-test-runner` | `622f697c9d` | Draft PR #5600 | `projects/hip-tests/catch/packaging/run_hiptests.py`; deletes `test/therock/test_hiptests.py` |
-| amdsmi | `users/jayhawk-commits/install-amdsmi-test-runner` | `d0f8a76704` | Draft PR #5601 | `projects/amdsmi/tests/amd_smi_test/run_amdsmi.py`; deletes `test/therock/test_amdsmi.py` |
-| rocprofiler-systems | `users/jayhawk-commits/install-rocprofiler-systems-test-runner` | `d7e15d4dfe` | Draft PR #5602 | `projects/rocprofiler-systems/tests/run_rocprofiler_systems.py`; deletes `test/therock/test_rocprofiler_systems.py` |
-| rocr-debug-agent | `users/jayhawk-commits/install-rocr-debug-agent-test-runner` | `a13010eb10` | Draft PR #5603 | `projects/rocr-debug-agent/test/run_rocr_debug_agent.py`; moves `test/therock/test_rocr-debug-agent.py` |
-| rocprofiler-compute | `users/jayhawk-commits/install-rocprofiler-compute-test-runner` | `7993246ec2` | Draft PR #5604 | `projects/rocprofiler-compute/tests/run_rocprofiler_compute.py`; deletes `test/therock/test_rocprofiler_compute.py` |
-| rocprofiler-sdk | `users/jayhawk-commits/install-rocprofiler-sdk-test-runner` | `237bea75a9` | Draft PR #5605 | `projects/rocprofiler-sdk/tests/run_rocprofiler_sdk.py`; deletes `test/therock/test_rocprofiler_sdk.py` |
-| rccl | `users/jayhawk-commits/install-rccl-test-runner` | `4041d54c06` | Draft PR #5606 | `projects/rccl/test/run_rccl.py`; deletes `test/therock/test_rccl.py` |
-| rccl-tests | `users/jayhawk-commits/install-rccl-tests-test-runner` | `c90bde22d8` | Draft PR #5607 | `projects/rccl-tests/test/run_rccl_tests.py` |
+| rocr-runtime / rocrtst | `users/jayhawk-commits/install-rocrtst-test-runner` | `9ef2a7668d` | Draft PR #5552; local follow-up not pushed | `projects/rocr-runtime/rocrtst/suites/test_common/run_rocrtst.py`; deletes `test/therock/test_rocrtst.py` |
+| aqlprofile | `users/jayhawk-commits/install-aqlprofile-test-runner` | `e3c7cd9231` | Draft PR #5597; local follow-up not pushed | `projects/aqlprofile/test/run_aqlprofile.py`; deletes `test/therock/test_aqlprofile.py` |
+| rocdecode | `users/jayhawk-commits/install-rocdecode-test-runner` | `e1d8c3d3d2` | Draft PR #5598; local follow-up not pushed | `projects/rocdecode/test/run_rocdecode.py`; moves `test/therock/test_rocdecode.py` |
+| rocjpeg | `users/jayhawk-commits/install-rocjpeg-test-runner` | `3cede0d2c3` | Draft PR #5599; local follow-up not pushed | `projects/rocjpeg/test/run_rocjpeg.py`; moves `test/therock/test_rocjpeg.py` |
+| hip-tests | `users/jayhawk-commits/install-hiptests-test-runner` | `74611122b6` | Draft PR #5600; local follow-up not pushed | `projects/hip-tests/catch/packaging/run_hiptests.py`; deletes `test/therock/test_hiptests.py` |
+| amdsmi | `users/jayhawk-commits/install-amdsmi-test-runner` | `b57aa0a2c6` | Draft PR #5601; local follow-up not pushed | `projects/amdsmi/tests/amd_smi_test/run_amdsmi.py`; deletes `test/therock/test_amdsmi.py` |
+| rocprofiler-systems | `users/jayhawk-commits/install-rocprofiler-systems-test-runner` | `93c7b17501` | Draft PR #5602; local follow-up not pushed | `projects/rocprofiler-systems/tests/run_rocprofiler_systems.py`; deletes `test/therock/test_rocprofiler_systems.py` |
+| rocr-debug-agent | `users/jayhawk-commits/install-rocr-debug-agent-test-runner` | `dc178a87f9` | Draft PR #5603; local follow-up not pushed | `projects/rocr-debug-agent/test/run_rocr_debug_agent.py`; moves `test/therock/test_rocr-debug-agent.py` |
+| rocprofiler-compute | `users/jayhawk-commits/install-rocprofiler-compute-test-runner` | `c5c2f002e5` | Draft PR #5604; local follow-up not pushed | `projects/rocprofiler-compute/tests/run_rocprofiler_compute.py`; deletes `test/therock/test_rocprofiler_compute.py` |
+| rocprofiler-sdk | `users/jayhawk-commits/install-rocprofiler-sdk-test-runner` | `3f655777b1` | Draft PR #5605; local follow-up not pushed | `projects/rocprofiler-sdk/tests/run_rocprofiler_sdk.py`; deletes `test/therock/test_rocprofiler_sdk.py` |
+| rccl | `users/jayhawk-commits/install-rccl-test-runner` | `dc66b6fec6` | Draft PR #5606; local follow-up not pushed | `projects/rccl/test/run_rccl.py`; deletes `test/therock/test_rccl.py` |
+| rccl-tests | `users/jayhawk-commits/install-rccl-tests-test-runner` | `7349861e45` | Draft PR #5607; local follow-up not pushed | `projects/rccl-tests/test/run_rccl_tests.py` |
 
 ## Notable Design Decisions
 
@@ -68,13 +68,19 @@ Each branch follows the same basic pattern:
   use consistent motivation, changes, validation, and not-run sections.
 - A 2026-04-29 cleanup pass made the runners more consistent with the rocrtst
   example and TheRock Python style guidance: executable shebangs, no stale
-  TheRock path wording, no helper-level `sys.exit()`, modern type syntax, and a
-  fixed RCCL default GPU selection of `0,1` instead of `2,3`.
+  TheRock path wording, no helper-level `sys.exit()`, and a fixed RCCL default
+  GPU selection of `0,1` instead of `2,3`.
 - The hip-tests branch was updated again after CI showed that
   `catch/packaging/CMakeLists.txt` tried to install
   `catch/packaging/run_hiptests.py`. The runner now lives beside that install
   logic at `catch/packaging/run_hiptests.py`, keeping the install rule as
   `${CMAKE_CURRENT_SOURCE_DIR}/run_hiptests.py`.
+- A 2026-04-30 Copilot-review follow-up was applied locally across the runner
+  PR branches. The follow-up removes silent source-tree fallbacks, treats empty
+  `ROCM_PATH` values as unset, validates installed test files before execution,
+  avoids direct `lib` assumptions where `lib64` may be used, fixes gtest filter
+  construction, and uses Python-compatible typing syntax in new runner scripts.
+  These commits have not been pushed yet.
 
 ## Validation Performed
 
@@ -84,6 +90,8 @@ For the prepared local branches:
   during this split.
 - `git diff --check origin/develop...HEAD` passed for all runner branches.
 - Each worktree was checked and was clean after its commit.
+- On 2026-04-30, syntax compilation via Python `compile()` and `git diff
+  --check` were rerun after the Copilot-review hardening commits.
 
 Full hardware test execution was not run locally. Several runners require ROCm
 install artifacts and suitable GPU hardware.
@@ -107,9 +115,11 @@ All runner worktrees are under `C:\Dev`:
 
 ## Next Steps
 
-1. Review the draft PRs in the order above or in the order maintainers are most
+1. Push the local 2026-04-30 hardening commits to the existing draft PR
+   branches after explicit approval.
+2. Review the draft PRs in the order above or in the order maintainers are most
    likely to accept.
-2. Promote draft PRs to ready-for-review after any desired local/package
+3. Promote draft PRs to ready-for-review after any desired local/package
    validation.
-3. After the rocm-systems PRs land, revisit TheRock PR 4581 and remove the
+4. After the rocm-systems PRs land, revisit TheRock PR 4581 and remove the
    copied-script install design.
