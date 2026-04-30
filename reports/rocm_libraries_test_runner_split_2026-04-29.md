@@ -73,6 +73,9 @@ For the prepared branches:
 - After the Copilot-review hardening pass, the new runner scripts were checked
   with `python -m py_compile`, `git diff --check`, and a targeted pattern scan
   for the issues found in the rocm-systems PRs.
+- A later readiness check on 2026-04-30 found all six worktrees clean and the
+  runner scripts still syntax-clean. `origin/develop` had advanced by four
+  commits, so rebase these branches again before pushing or opening PRs.
 
 Full hardware/package validation was not run locally. These runners need ROCm
 install artifacts and suitable GPU hardware to exercise the actual test suites.
@@ -90,8 +93,8 @@ The branches are local only at the time of this note. No push or PR was created.
 
 ## Next Actions
 
-1. Push the prepared rocm-libraries branches and open draft PRs only after
-   explicit approval.
+1. Rebase the prepared rocm-libraries branches onto current `origin/develop`,
+   then push and open draft PRs only after explicit approval.
 2. Continue the split with the remaining larger buckets: BLAS, MIOpen, and
    hipDNN/providers.
 3. For the provider/integration-test area, include the newer TheRock-only
