@@ -46,11 +46,11 @@ Each branch follows the same basic pattern:
 | rocdecode | `users/jayhawk-commits/install-rocdecode-test-runner` | `e1d8c3d3d2` | PR #5598 updated on 2026-04-30 | `projects/rocdecode/test/run_rocdecode.py`; moves `test/therock/test_rocdecode.py` |
 | rocjpeg | `users/jayhawk-commits/install-rocjpeg-test-runner` | `3cede0d2c3` | PR #5599 updated on 2026-04-30 | `projects/rocjpeg/test/run_rocjpeg.py`; moves `test/therock/test_rocjpeg.py` |
 | hip-tests | `users/jayhawk-commits/install-hiptests-test-runner` | `74611122b6` | PR #5600 updated on 2026-04-30 | `projects/hip-tests/catch/packaging/run_hiptests.py`; deletes `test/therock/test_hiptests.py` |
-| amdsmi | `users/jayhawk-commits/install-amdsmi-test-runner` | `b57aa0a2c6` | PR #5601 updated on 2026-04-30 | `projects/amdsmi/tests/amd_smi_test/run_amdsmi.py`; deletes `test/therock/test_amdsmi.py` |
-| rocprofiler-systems | `users/jayhawk-commits/install-rocprofiler-systems-test-runner` | `93c7b17501` | PR #5602 updated on 2026-04-30 | `projects/rocprofiler-systems/tests/run_rocprofiler_systems.py`; deletes `test/therock/test_rocprofiler_systems.py` |
+| amdsmi | `users/jayhawk-commits/install-amdsmi-test-runner` | `423e767901` | PR #5601 updated on 2026-04-30 | `projects/amdsmi/tests/amd_smi_test/run_amdsmi.py`; deletes `test/therock/test_amdsmi.py` |
+| rocprofiler-systems | `users/jayhawk-commits/install-rocprofiler-systems-test-runner` | `e92dbbc229` | PR #5602 updated on 2026-04-30 | `projects/rocprofiler-systems/tests/run_rocprofiler_systems.py`; deletes `test/therock/test_rocprofiler_systems.py` |
 | rocr-debug-agent | `users/jayhawk-commits/install-rocr-debug-agent-test-runner` | `dc178a87f9` | Branch updated on 2026-04-30; PR #5603 is closed and superseded | `projects/rocr-debug-agent/test/run_rocr_debug_agent.py`; moves `test/therock/test_rocr-debug-agent.py` |
 | rocprofiler-compute | `users/jayhawk-commits/install-rocprofiler-compute-test-runner` | `c5c2f002e5` | PR #5604 updated on 2026-04-30 | `projects/rocprofiler-compute/tests/run_rocprofiler_compute.py`; deletes `test/therock/test_rocprofiler_compute.py` |
-| rocprofiler-sdk | `users/jayhawk-commits/install-rocprofiler-sdk-test-runner` | `3f655777b1` | PR #5605 updated on 2026-04-30 | `projects/rocprofiler-sdk/tests/run_rocprofiler_sdk.py`; deletes `test/therock/test_rocprofiler_sdk.py` |
+| rocprofiler-sdk | `users/jayhawk-commits/install-rocprofiler-sdk-test-runner` | `3637824700` | PR #5605 updated on 2026-04-30 | `projects/rocprofiler-sdk/tests/run_rocprofiler_sdk.py`; deletes `test/therock/test_rocprofiler_sdk.py` |
 | rccl | `users/jayhawk-commits/install-rccl-test-runner` | `dc66b6fec6` | PR #5606 updated on 2026-04-30 | `projects/rccl/test/run_rccl.py`; deletes `test/therock/test_rccl.py` |
 | rccl-tests | `users/jayhawk-commits/install-rccl-tests-test-runner` | `7349861e45` | PR #5607 updated on 2026-04-30 | `projects/rccl-tests/test/run_rccl_tests.py` |
 
@@ -83,6 +83,12 @@ Each branch follows the same basic pattern:
   These commits were pushed to the rocm-systems branches on 2026-04-30. PR
   #5603 had already been closed and superseded, so its branch was updated but
   the PR remains closed.
+- A later 2026-04-30 follow-up fixed the remaining immediate PR hygiene
+  failures: PR #5600's body was updated to the HIP PR-description section
+  format with the current `catch/packaging/run_hiptests.py` path, PR #5601 got
+  the formatter-generated amdsmi changes, and PRs #5602/#5605 got Black line
+  wrapping updates. A latest-check scan after those updates showed no current
+  failed checks, with longer CI jobs still running.
 
 ## Validation Performed
 
