@@ -26,7 +26,7 @@ This follows the design direction from TheRock PR 4581 review feedback:
 | prim | `users/jayhawk-commits/install-prim-test-runners` | `b23478f7f1` | Rebased and hardened on 2026-04-30; local only; not pushed | `projects/hipcub/test/run_hipcub.py`, `projects/rocprim/test/run_rocprim.py`, `projects/rocthrust/test/run_rocthrust.py`; removes the old prim copies from `test/therock` |
 | solver | `users/jayhawk-commits/install-solver-test-runners` | `1ea247f7fd` | Rebased and hardened on 2026-04-30; local only; not pushed | `projects/hipsolver/clients/gtest/run_hipsolver.py`, `projects/rocsolver/clients/gtest/run_rocsolver.py`; removes the old solver copies from `test/therock` |
 | sparse | `users/jayhawk-commits/install-sparse-test-runners` | `5cdbc0a5f5` | Rebased and hardened on 2026-04-30; local only; not pushed | `projects/hipsparse/clients/tests/run_hipsparse.py`, `projects/hipsparselt/clients/gtest/run_hipsparselt.py`, `projects/rocsparse/clients/tests/run_rocsparse.py`; removes the old sparse copies from `test/therock` |
-| rocwmma | `users/jayhawk-commits/install-rocwmma-test-runner` | `340011ab05` | Rebased and hardened on 2026-04-30; local only; not pushed | `projects/rocwmma/test/run_rocwmma.py`; removes the old rocWMMA copy from `test/therock` |
+| rocwmma | `users/jayhawk-commits/install-rocwmma-test-runner` | `40fa6b8d57` | Rebased, hardened, and synced with TheRock on 2026-05-01; local only; not pushed | `projects/rocwmma/test/run_rocwmma.py`; removes the old rocWMMA copy from `test/therock` |
 
 The rand slice was chosen first because both runners are simple CTest wrappers
 and both projects already install a `CTestTestfile.cmake` under
@@ -76,6 +76,12 @@ For the prepared branches:
 - A later readiness check on 2026-04-30 found all six worktrees clean and the
   runner scripts still syntax-clean. `origin/develop` had advanced by four
   commits, so rebase these branches again before pushing or opening PRs.
+- On 2026-05-01, TheRock `origin/main` was fetched and recent changes under
+  `build_tools/github_actions/test_executable_scripts` were reviewed. The only
+  relevant new change was TheRock commit `4523223d`, which added
+  `contamination_test` and `map_util_test` to the rocWMMA disabled-test list.
+  That was carried into the rocWMMA branch as `40fa6b8d57`. No rocm-systems
+  runner PRs were affected by the latest TheRock test-script changes.
 
 Full hardware/package validation was not run locally. These runners need ROCm
 install artifacts and suitable GPU hardware to exercise the actual test suites.
