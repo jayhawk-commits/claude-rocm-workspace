@@ -51,3 +51,20 @@ The one thing I would like to verify before this data becomes the workflow sourc
 This looks like a parity drift from the current matrix. In `amdgpu_family_matrix.py`, Linux `tsan` is defined without an `expect_failure` override, so current consumers treat TSAN as blocking. With this replacement data, `BuildVariantInfo.to_dict()` will serialize `expect_failure=True`, and a future migration would turn TSAN into a continue-on-error job unless that policy change is deliberate.
 
 Since current workflow generation still uses the legacy matrix, I do not think this is an active workflow regression in this PR. Could we either remove this flag for parity, or add an explicit test/comment showing that making TSAN expected-failure is intentional before the new matrix is wired into CI generation?
+
+## Suggested Design Review Comment
+
+**Review state:** Comment
+
+I took another pass over the design in the latest state. I like the direction of splitting the old experimental matrix into schema, data, and runner-inventory modules. The dataclasses make the fields much easier to reason about, and deriving family membership from `cmake/therock_amdgpu_targets.cmake` is a good move toward having one target source of truth.
+
+The open design question for me is the boundary between declarative matrix data and workflow-expansion policy. Right now the new modules do both: `MatrixEntry.__post_init__()` fills build/test runner labels and infers `run_tests`, while `get_entry(..., build_variant=...)` returns a deep copy with unsupported platforms removed, `build_variants` trimmed to the requested variant, and build runners rebound for sanitizer variants. Those are useful operations, but they make the matrix context-sensitive: what an entry means depends on how it was looked up.
+
+That matters during this transition because the live configure scripts still consume `amdgpu_family_matrix.py`. While both sources exist, the design needs either strong parity checks or a very explicit migration boundary. The TSAN `expect_failure` drift I commented on is one concrete example of how easy it is for replacement data to diverge from the live workflow behavior.
+
+I think the cleanest path is to choose one of these boundaries before this becomes the workflow source of truth:
+
+* Keep the new files mostly declarative: exact CMake target entries, runner inventory as data, and family-name/default resolution only as an input-normalization layer. Let `configure_ci.py` / `configure_multi_arch_ci.py` own variant scoping and concrete runner selection.
+* Or make this module the workflow-generation API, but then wire at least one consumer or add parity tests that compare the workflow-facing serialized rows against the current matrix for representative trigger and build-variant cases.
+
+I am leaning toward the first shape, or at least a narrow first merge, because the family-default aliases and eager runner binding are useful but should not become foundational until we prove they preserve the live configure behavior.
