@@ -46,6 +46,22 @@ WSL-only `THEROCK_ENABLE_BASE=OFF` case under the current top-level structure.
 - The WSL stage generated args do not enable `BASE`, so this guard is needed to
   keep a WSL-only stage from pulling base into the build graph.
 
+## Feature-Gating Pattern
+
+`THEROCK_ENABLE_CORE` is a feature group default, not a directory-level guard.
+It is consumed by generated per-artifact feature declarations such as
+`THEROCK_ENABLE_BASE`, `THEROCK_ENABLE_CORE_RUNTIME`, and
+`THEROCK_ENABLE_HIP_RUNTIME`.
+
+The closer established pattern is therefore to guard artifact sections with the
+generated artifact feature variable. `base/CMakeLists.txt` now follows that
+shape with an `if(THEROCK_ENABLE_BASE) ... endif(THEROCK_ENABLE_BASE)` wrapper
+instead of a top-level early return.
+
+There are many early-return examples in dual-mode third-party and sysdeps
+CMakeLists files, but those are not the closest pattern for generated feature
+gates.
+
 ## Verification So Far
 
 - `python build_tools/topology_to_cmake.py --validate-only` passes.

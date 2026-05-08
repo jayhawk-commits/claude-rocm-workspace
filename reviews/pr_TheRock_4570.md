@@ -3,27 +3,46 @@
 * **PR:** https://github.com/ROCm/TheRock/pull/4570
 * **Title:** `[ci] Adding determine_rocm_test_dependencies.py script`
 * **Base:** `main`
-* **Head:** `060a50d2056bf22f87db56e65c69a8cf336d5a3c`
-* **Reviewed:** 2026-04-30
+* **Head:** `b972362a8b68e1cc5c996f0a0db3d40844b36c1f`
+* **Reviewed:** 2026-05-06
 * **State at review:** OPEN
 
 ---
 
 ## Overall Assessment
 
-**CHANGES REQUESTED** - The new dependency-selection script can silently drop CMake files on any read error. Because this script is meant to reduce downstream tests, silent degradation can become under-testing.
+**NO NEW BLOCKING FINDINGS** - The original review finding was addressed: `parse_cmake_test_subprojects()` no longer catches and suppresses CMake file read errors. I would not repeat that comment.
+
+## Latest Comment Check
+
+Checked latest PR state on 2026-05-06 at head `b972362a`. Existing comments cover the move from `build_tools` to `test_tools` and the previously requested fail-fast behavior for the broad `try` block. The broad `try` block is gone in the latest source.
 
 ## Findings
 
-### BLOCKING: CMake read failures are silently ignored
+No remaining blocking findings in the latest head.
 
-`parse_cmake_test_subprojects()` catches every exception from `cmake_file.read_text()` and continues at [`determine_rocm_test_dependencies.py#L27-L31`](https://github.com/ROCm/TheRock/blob/060a50d2056bf22f87db56e65c69a8cf336d5a3c/test_tools/determine_rocm_test_dependencies.py#L27-L31). If the script cannot read a relevant `CMakeLists.txt` due to encoding, path, filesystem, or environment issues, it returns an incomplete dependency map without failing the CI step.
+## Notes
 
-That is risky for this feature specifically: a missing dependency entry means the caller may skip tests that should have run.
+The invalid `--therock-dir` case is not worth holding the PR on. A typo in `--therock-dir` currently returns only the changed project instead of failing:
 
-**Required action:** Fail fast on unexpected read errors. Prefer `read_text(encoding="utf-8")` and let exceptions propagate, or catch only a very narrow, justified exception and log enough context before re-raising.
+```powershell
+$ python test_tools\determine_rocm_test_dependencies.py --projects rocBLAS
+["hipblas", "rocblas", "rocsolver"]
+
+$ python test_tools\determine_rocm_test_dependencies.py --therock-dir .\does-not-exist --projects rocBLAS
+["rocblas"]
+```
+
+That could be hardened later by validating that `therock_dir` exists and contains CMake files, but I would treat it as optional because the CI caller controls this value and a bad workspace/root should fail quickly elsewhere.
+
+The parser currently uses `\w+` for both the declared subproject name and `TEST_SUBPROJECTS` entries. That works for the BLAS entries in this PR, but it will not be safe for future names containing hyphens. If this helper expands beyond the current BLAS/Sparse cases, add tests for hyphenated TheRock target/test names before relying on it for those projects.
 
 ## Verification
 
-* Inspected the PR diff and changed CMake declarations.
-* Ran `python test_tools\tests\determine_rocm_test_dependencies_test.py -v`; both tests passed locally.
+* Refreshed `origin/main`, `refs/remotes/pr/4570`, PR metadata, and inline review comments on 2026-05-06.
+* Reviewed local worktree at `b972362a`.
+* Confirmed the prior broad `try/except` around `cmake_file.read_text()` was removed.
+* Ran `python test_tools\tests\determine_rocm_test_dependencies_test.py -v` - passed, 2 tests.
+* Ran `python -m py_compile test_tools\determine_rocm_test_dependencies.py test_tools\tests\determine_rocm_test_dependencies_test.py` - passed.
+* Ran `git -c safe.directory=* diff --check origin/main...HEAD` - passed.
+* Latest GitHub checks show pre-commit and unit tests passing; larger Multi-Arch CI still has failures at review time.
