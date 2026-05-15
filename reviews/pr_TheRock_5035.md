@@ -28,7 +28,7 @@ That means the structured output appears to be ephemeral unless an external runn
 
 ### LOW: timeout counts are double counted inside `parse_stdout_log()`
 
-`parse_stdout_log()` copies `parsed.timeout_count` into `result.timeout_count`, then increments it again while converting each timeout test into a `FailedTest` at [`report_failed_tests.py#L247-L254`](https://github.com/ROCm/TheRock/blob/59551b124fa6ed5b1fb8439ed4d0d5efd87aaedc/test_tools/report_failed_tests.py#L247-L254). The current metrics output does not emit the aggregate count, so this is not a visible reporting bug yet, but it is worth fixing while the helper is new and adding a test assertion for the count.
+`parse_test_output()` already increments the parsed aggregate timeout count when it sees a timeout. `parse_stdout_log()` then copies that value into `result.timeout_count`, and increments it again while converting each timeout test into a `FailedTest` at [`report_failed_tests.py#L247-L254`](https://github.com/ROCm/TheRock/blob/59551b124fa6ed5b1fb8439ed4d0d5efd87aaedc/test_tools/report_failed_tests.py#L247-L254). The current metrics output does not emit the aggregate count, so this is not a visible reporting bug yet, but it is worth fixing while the helper is new and adding a test assertion for the count.
 
 ## Suggested Review Comment
 
