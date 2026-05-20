@@ -64,7 +64,18 @@ Every red bump candidate should be classified within 1 hour of actionable CI sig
 - **False red or routing bug:** irrelevant test, bad matrix dependency, label drift, dispatch default, or path-routing issue. Fix or explicitly waive impacted lanes.
 - **Workflow hygiene defect:** inconsistent SHA, stale ref PR, mutable branch, or matrix parity drift. Repair before relying on the path.
 
-Each category should map to a label or issue field used consistently across bump PRs and follow-up issues. At minimum, the label set should distinguish infra flake, known unrelated failure, bump regression, false green risk, false red/routing bug, and workflow hygiene.
+Use one primary cause label per failure cluster, plus optional dimension labels for repo, platform, GPU family, component, and stage. The proposed primary labels are:
+
+| Cause | Primary Label | Required Follow-Up Fields |
+| --- | --- | --- |
+| Infrastructure flake | `ci:infra-flake` | runner/platform, job name, first seen, rerun result, infrastructure owner |
+| Known unrelated failure | `ci:known-unrelated` | baseline evidence, owner, tracking issue, affected scope, expiry |
+| Bump-caused regression | `ci:bump-regression` | old SHA, new SHA, first failing stage, suspected component, upstream owner |
+| False green risk | `ci:false-green-risk` | untrusted signal, missing assertion, workflow path, required guardrail |
+| False red or routing bug | `ci:false-red-routing` | irrelevant job/test, routing rule, label or matrix cause, proposed fix |
+| Workflow hygiene defect | `ci:workflow-hygiene` | stale ref, mutable ref, SHA mismatch, path drift, cleanup owner |
+
+Use disposition labels separately: `bump:ready`, `bump:accepted-red`, `bump:blocked`, and `bump:superseded`. A red bump PR should not merge until each red cluster has either a `ci:*` cause label on the PR or a linked categorized issue with owner, scope, and expiry where applicable.
 
 ## Four-Week Plan
 
