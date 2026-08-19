@@ -34,43 +34,22 @@ For example:
 
 ## AI Efficiency And Workflow Control
 
-- Use the most capable reasoning available for architecture, orchestration,
-  cross-document synthesis, and constraint-heavy analysis. When model routing
-  is available, use lighter models for routine implementation, extraction,
-  formatting, classification, and bulk operations. For GPU kernel, assembly,
-  ISA, RTL, and formal-verification work, prioritize demonstrated correctness
-  over model downgrades.
-- Optimize for end-to-end cost and quality, including context replay, retries,
-  and rework. A cheaper generation model is not necessarily cheaper overall.
-- Read large or unchanged files once when practical. Use targeted searches,
-  retain concise findings, and summarize completed tool output instead of
-  repeatedly replaying full logs or file contents.
-- For long-running tasks, checkpoint a compact state summary before context is
-  roughly half full. Prefer small state files or task notes over full transcript
-  dumps, and continue from the checkpoint rather than reconstructing history.
-- When authoring LLM prompts, put stable instructions, tool definitions, and
-  examples before history and dynamic user data. If cache metrics are available,
-  target a prompt-cache hit rate above 70% and investigate rates below 60%.
-- Bound output explicitly when the interface supports it. Set max_tokens, a
-  response-size target, and a concrete output format; request only the fields,
-  changed lines, or artifact needed by the next step.
-- Keep the active MCP/tool surface specific to the task. Trim oversized tool
-  descriptions and prefer search-based or deferred loading when a workflow
-  would otherwise expose roughly 30--40 or more tools.
-- Enable extended thinking deliberately, with a stated budget or level. Compare
-  it with a lighter setting before making it the default for a repeated or
-  automated workflow.
-- Automated workflows must define stopping conditions and ceilings for steps,
-  wall-clock time, exploration, retries, and concurrent agents. Use exponential
-  backoff with a maximum retry count; never retry indefinitely.
-- Add cost/usage telemetry and a circuit breaker for repeated workflows when
-  practical. Pause and surface anomalous runs rather than silently consuming
-  several times the normal baseline.
-- Require dry-run support and an explicit human approval point before automated
-  commits, broad file writes, deployments, or other consequential actions.
-- Do not rely on the same model instance to grade its own consequential output.
-  Use deterministic checks, an independent reference, or a genuinely independent
-  review pass, and break long chains into separately verifiable stages.
+Follow `AI_EFFICIENCY.md`. Read it in full before designing, reviewing, or
+scaling an LLM-backed pipeline, scheduled agent, multi-agent system, or reusable
+prompt/tool surface. For normal interactive work:
+
+- Route planning and complex reasoning to the most capable suitable model when
+  routing is available; use lighter execution only when quality evidence
+  supports it. Treat GPU kernel, assembly, ISA, RTL, and formal work as a quality
+  exception rather than an automatic downgrade candidate.
+- Avoid repeated large-file and full-log reads. Keep concise state, checkpoint at
+  a workload-appropriate point before context becomes large, and retain full
+  evidence only while it is needed.
+- Bound output and reasoning effort when the interface exposes those controls.
+  Keep the active tool surface specific to the task.
+- Automated workflows require explicit execution, retry, concurrency, cost, and
+  approval bounds from `AI_EFFICIENCY.md`; do not infer that interactive defaults
+  are sufficient for unattended execution.
 
 ## Project Context
 

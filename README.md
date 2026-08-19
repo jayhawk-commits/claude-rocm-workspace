@@ -45,9 +45,11 @@ claude-rocm-workspace/
     └── settings.json      # Workspace settings
 ```
 
-Codex-specific additions:
+Agent guidance and Codex support:
 
 - [`AGENTS.md`](/AGENTS.md) - Repo-local instructions that Codex reads
+- [`AI_EFFICIENCY.md`](/AI_EFFICIENCY.md) - Shared model, token-efficiency, and
+  automated-workflow guidance for Claude and Codex
 - [`scripts/codex.bat`](/scripts/codex.bat) - Codex launcher with the workspace
   Python environment activated
 
