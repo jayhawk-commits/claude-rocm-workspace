@@ -1,6 +1,17 @@
 # Code Review System
 
-This directory contains code review documentation and completed reviews.
+This directory contains code review documentation and completed reviews for
+Claude and Codex. Use [REVIEW_GUIDELINES.md](REVIEW_GUIDELINES.md) for the shared
+evidence, severity and concise output contract.
+
+For requested personas or substantive changes that cross domain boundaries, use
+the [review panel](../skills/review-panel/SKILL.md) and select relevant roles from
+[personas.md](personas.md). Ordinary focused reviews remain lightweight. A panel
+starts with two reviewers plus the coordinator; its skill defines bounded rounds,
+retries and completion requirements. For persistent findings and supervised
+processes, use the [local Peanut Review harness](../tools/peanut-review/LOCAL_SETUP.md)
+with the same persona references. Native delegation remains available without
+installing a separate runtime.
 
 ---
 
@@ -51,10 +62,10 @@ See [REVIEW_TYPES.md](REVIEW_TYPES.md) for detailed descriptions.
 ## How It Works
 
 1. **You request a review** with specific focus areas
-2. **Claude analyzes** your code with that focus in mind
+2. **The reviewer analyzes** a recorded base/merge-base/head snapshot with that focus
 3. **Review is written** to `reviews/pr_{REPO}_{NUMBER}.md` or `reviews/local_{COUNTER}_{branch-name}.md` (with `_{TYPE}` suffix for focused reviews)
 4. **You address issues** based on severity (❌ BLOCKING, ⚠️ IMPORTANT, 💡 SUGGESTION)
-5. **Claude can re-review** after you fix blocking issues
+5. **The reviewer can re-review** after authorized fixes, preserving finding history
 
 ---
 
@@ -62,11 +73,11 @@ See [REVIEW_TYPES.md](REVIEW_TYPES.md) for detailed descriptions.
 
 ### ❌ BLOCKING (Must Fix)
 
-Critical issues that prevent approval:
+Issues supported by a valid trigger and concrete impact that prevent approval:
 
 - Bugs and correctness issues
 - Security vulnerabilities
-- Incomplete cleanup (dead code)
+- Incomplete cleanup that breaks an affected caller or required contract
 - Missing critical tests
 - Breaking changes without migration
 
@@ -97,6 +108,19 @@ Improvements for later:
 - Large-scale changes
 
 ---
+
+## Review Outcome and Authority
+
+Recommend **APPROVED**, **CHANGES REQUESTED**, or **WAIT FOR EVIDENCE**, naming any
+material missing evidence. Severity follows impact and verified requirements;
+style preferences and harmless dead code are not automatic blockers. A green CI
+run supports only exercised paths. A failed or skipped reviewer is not approval.
+
+Reviewers do not edit source. In an authorized implementation task, the developer
+may fix or rebut findings and request a bounded follow-up; the panel does not
+automatically commit or publish. Keep private evidence and local continuity out
+of shareable artifacts. Use the intended GitHub identity per operation without
+switching the global login.
 
 ## File Naming Convention
 
@@ -162,7 +186,8 @@ are not active review work produced in this workspace.
 
 - **[README.md](README.md)** - This quick start guide
 - **[REVIEW_GUIDELINES.md](REVIEW_GUIDELINES.md)** - Detailed guidelines for writing reviews
-- **[REVIEW_TYPES.md](REVIEW_TYPES.md)** - Complete review type definitions and examples
+- **[REVIEW_TYPES.md](REVIEW_TYPES.md)** - Review focus definitions
+- **[personas.md](personas.md)** - Specialist selection and bounded panel usage
 
 ---
 
@@ -199,7 +224,7 @@ Claude:
 - Launches two review agents simultaneously
 - One analyzes test coverage
 - One analyzes documentation
-- Combines results into reviews/local_001_my-branch-name.md with separate sections
+- Reconciles evidence and deduplicates results into reviews/local_001_my-branch-name.md
 ```
 
 ### Example 4: Sequential Reviews
@@ -245,8 +270,8 @@ Claude: [Creates updated review, verifies fixes]
    - Architecture review for design validation
 
 2. **Pre-submission:** Run comprehensive review
-   - Catches all issues before human review
-   - Ensures complete coverage
+   - Checks relevant changed contracts before human review
+   - Records the coverage and verification limits
 
 3. **Fix and iterate:** Address blocking issues
    - Fix ❌ BLOCKING items first
@@ -256,7 +281,7 @@ Claude: [Creates updated review, verifies fixes]
 4. **Submit for human review:** When approved
    - All blocking issues resolved
    - Important issues addressed or documented
-   - Review file included for human reviewer context
+   - Shareable findings prepared; publication only when authorized
 
 ---
 
@@ -265,7 +290,7 @@ Claude: [Creates updated review, verifies fixes]
 ### For Getting Good Reviews
 
 1. **Be specific:** "Review tests" is more focused than "Review everything"
-2. **Use parallel reviews:** Save time by running multiple types at once
+2. **Select relevant reviewers:** Use the panel when independent domain perspectives help
 3. **Iterate:** Fix blocking issues, then re-review
 4. **Ask questions:** If a review finding is unclear, ask for clarification
 5. **Include context:** Mention relevant background when requesting reviews
@@ -273,7 +298,7 @@ Claude: [Creates updated review, verifies fixes]
 ### For Understanding Review Results
 
 1. **Severity matters:** ❌ blocks approval, 💡 is optional
-2. **Context matters:** BLOCKING in one review type isn't blocking in another
+2. **Context matters:** Severity follows demonstrated impact, not review type
 3. **Reviews complement:** A comprehensive review might miss deep issues a focused review catches
 4. **Not all suggestions apply:** Use judgment on 💡 SUGGESTIONS
 5. **Future work is OK:** 📋 items can be deferred to later PRs

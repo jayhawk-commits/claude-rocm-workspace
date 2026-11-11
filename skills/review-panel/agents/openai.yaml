@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Panel"
+  short_description: "Scoped personas with evidence-based review curation"
+  default_prompt: "Use $review-panel to review this change with the relevant specialists and reconcile their findings."

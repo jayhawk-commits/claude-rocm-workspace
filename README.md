@@ -68,6 +68,42 @@ The [`reviews/`](/reviews/) directory contains a structured code review system.
 
 See [`reviews/README.md`](/reviews/README.md) for full documentation.
 
+For specialist review, use the shared
+[`review-panel` skill](skills/review-panel/SKILL.md). It selects a small set of
+[personas](reviews/personas.md), records the reviewed revisions, and validates
+their findings before producing the normal review. Examples:
+
+```text
+Use $review-panel to review this PR with CI and test-evidence personas.
+Review my branch against origin/develop using build and packaging specialists.
+Use Lisa for the ISA changes and Simone for the simulation timing changes.
+```
+
+Install local discovery links for Codex and Claude on Windows:
+
+```powershell
+.\scripts\setup-review-panel.ps1
+# Also discover the skill when sessions start at the parent workspace:
+.\scripts\setup-review-panel.ps1 -SessionRoot (Split-Path -Parent $PWD.Path)
+```
+
+The script creates local junctions under `.agents/skills/` and
+`.claude/skills/`, pointing to the single tracked `skills/review-panel/`
+source. It supports `-WhatIf`, is safe to rerun, and refuses to replace existing
+unrelated paths. On systems with symlinks, link those same skill directories
+to the canonical source. Restart the agent if a new skill does not appear.
+Sibling source repositories may require direct invocation by the canonical
+skill path when they do not inherit this workspace's discovery root.
+
+Interactive run artifacts stay in ignored `.cache/review-runs/`; private
+references use a separate local destination. For persistent comments and
+supervised reviewer/curator processes, the
+[Peanut Review harness](tools/peanut-review/LOCAL_SETUP.md) is included under
+`tools/peanut-review/`, with [upstream provenance](tools/peanut-review/UPSTREAM.md).
+The Windows entrypoint is `scripts/peanut-review.ps1`; it runs in WSL, uses the
+same personas, and stores sessions outside source repositories. It requires an
+explicit model and effort and does not publish reviews.
+
 Inherited review notes from the source workspace are kept under
 [`reviews/reference/inherited/`](/reviews/reference/inherited/). They remain
 available as reference material, but are separated from review work produced in

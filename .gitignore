@@ -9,6 +9,18 @@
 # Local Claude Code settings (machine-specific permissions)
 .claude/settings.local.json
 
+# Local skill discovery junctions; canonical source is in skills/.
+.agents/skills/review-panel
+.claude/skills/review-panel
+
+# Review evidence and optional private reference routing stay local.
+.cache/review-runs/
+.cache/peanut-review/
+.peanut-review.json
+.pytest_cache/
+*.egg-info/
+LOCAL_CONTEXT.md
+
 # Temporary files
 *.tmp
 *.swp

@@ -1,106 +1,97 @@
 ---
 description: Review the current local branch
 allowed-tools: Bash(git:*), Read, Write, Glob, Grep, Task
-argument-hint: [review-type ...]
+argument-hint: [--base <ref>] [review-type ...]
 ---
 
-Review the current local branch comprehensively or with specific focus areas.
+Review local branch changes using the workspace's evidence and output conventions.
+A review request authorizes local review artifacts, not implementation or commits.
 
 ## Arguments
 
-- `$ARGUMENTS` contains: `[review-type ...]`
-- Optional review types: `style`, `tests`, `documentation`, `architecture`, `security`, `performance`
-- If no review types specified, perform a comprehensive review (all aspects)
+- `$ARGUMENTS`: `[--base <ref>] [review-type ...]`.
+- Optional types: `style`, `tests`, `documentation`, `architecture`, `security`,
+  `performance`; absent a focus, review relevant aspects of the whole change.
+- Explicit personas or substantive changes crossing domain boundaries can use
+  the [review panel](../../skills/review-panel/SKILL.md). Keep small focused
+  reviews lightweight.
 
-## Process
+## Establish the Reviewed Snapshot
 
-### 1. Get Branch Information
+Determine the target repository and inspect its state without changing it:
 
 ```bash
 git branch --show-current
-git log --oneline main..HEAD  # or upstream/main
-git diff --stat main..HEAD
+git status --short
+git rev-parse HEAD
 ```
 
-Determine:
-- Current branch name
-- Base branch (main or upstream/main)
-- Number of commits
-- Files changed
+Resolve the intended base from `--base`, the user's task, or PR/repository context.
+A tracking branch can be the feature branch itself and is not automatically the
+review base. Do not assume `main`. Ask only if the base remains ambiguous after
+checking available context.
 
-### 2. Determine Review Counter
+Freeze the actual target base and head SHAs, then compute the merge base:
 
-Scan `reviews/local_*.md` files to find the next counter number (001, 002, etc.).
-
-### 3. Sanitize Branch Name
-
-Convert branch name to filename-safe format:
-- Replace `/` with `-`
-- Keep other characters
-
-Example: `users/myname/fix-bug` becomes `users-myname-fix-bug`
-
-### 4. Review Setup
-
-- Read `reviews/REVIEW_GUIDELINES.md` for severity levels and format
-- Read `reviews/REVIEW_TYPES.md` if doing focused reviews
-- Determine output filename: `reviews/local_{COUNTER}_{branch-name}.md` or `reviews/local_{COUNTER}_{branch-name}_{TYPE}.md`
-
-### 5. Perform Review
-
-Get the diff to review:
 ```bash
-git diff main..HEAD
+git rev-parse <base-ref>
+git merge-base <base-sha> <head-sha>
+git log --oneline <merge-base-sha>..<head-sha>
+git diff --stat <merge-base-sha> <head-sha>
+git diff <merge-base-sha> <head-sha>
 ```
 
-Follow the review guidelines:
+Run from the target repository, or use `git -C <repository>` from the workspace.
+Record all three SHAs; use this immutable range for every reviewer. Read committed
+source from that head, separately from any requested working-tree snapshot. If no merge
+base is available, explain the missing history rather than guessing a range.
 
-**Comprehensive review (default):** Analyze all aspects:
-- Correctness and logic
-- Code style and conventions
-- Test coverage
-- Documentation
-- Architecture and design
-- Security concerns
-- Performance implications
+Do not silently omit requested uncommitted changes. For a request about the
+working tree, also capture staged and unstaged patches and the requested untracked
+files as a separate snapshot; record their scope and whether it changed during
+review. Never commit, reset or clean the worktree just to prepare a review.
 
-**Focused review(s):** If specific types requested, focus only on those areas.
+## Review Setup
 
-**Multiple types:** If multiple types given (e.g., `style tests`), either:
-- Combine findings into sections in one review file, OR
-- Use Task tool to run reviews in parallel if appropriate
+- Read `reviews/README.md`, `reviews/REVIEW_GUIDELINES.md`, and relevant target
+  repository instructions. Read focus/domain guidelines only as needed.
+- Scan `reviews/local_*.md` for the next counter (001, 002, etc.). Preserve review
+  history for a re-review instead of overwriting unrelated work.
+- Replace `/` in the branch label with `-` and sanitize other filename-invalid
+  characters for the host OS. Use a descriptive snapshot label for detached HEAD.
+- Save `reviews/local_{COUNTER}_{branch-name}.md`, or append `_{TYPE}` for a
+  focused review.
+- For a panel, follow its selection, run records and completion rules; see
+  [personas](../../reviews/personas.md). Do not start an unbounded reviewer lineup.
 
-### 6. Write Review File
+## Review and Reconcile
 
-Create the review file following the template in `REVIEW_GUIDELINES.md`:
-- Header with branch name, base, date, commits
-- Summary of changes
-- Overall assessment (APPROVED / CHANGES REQUESTED / REJECTED)
-- Detailed findings with severity markers (BLOCKING, IMPORTANT, SUGGESTION, FUTURE WORK)
-- Recommendations organized by severity
-- Testing recommendations
-- Conclusion
+Trace the changed behavior through callers and consumers, compare base and head,
+and use relevant tests or CI to confirm or reject candidate findings. Focus on
+actual consequences and applicable requirements, not speculative cleanup.
 
-### 7. Report Results
+For multiple focus areas, combine supported findings in one report. If separate
+reviewers are useful, give them the same frozen inputs and reconcile their results
+using the review-panel workflow. Do not treat repeated opinions as independent
+evidence or a skipped/failed review as approval.
 
-After writing the review file:
-- Report the location of the review file
-- Summarize the overall assessment
-- List any blocking issues found
+Before delivery, recheck the base ref, HEAD and any included worktree snapshot. If they changed,
+review the relevant new changes and repair anchors, or state that the result
+applies only to the recorded snapshot. Preserve other sessions' edits.
+
+## Deliver the Review
+
+Follow `reviews/REVIEW_GUIDELINES.md`: actionable findings in severity order,
+recommendation to approve/request changes/wait for specific evidence, exact paths
+and current lines outside concise copy-pastable comment blocks, and a separate
+overall review comment. Record the base, merge-base, head, scope, verification and
+limits. Working-tree-only lines must be labeled as such rather than called GitHub
+diff anchors. Report the file location and meaningful unresolved issues.
 
 ## Examples
 
-**Comprehensive review:**
-```
+```text
 /review-branch
-```
-
-**Focused style review:**
-```
-/review-branch style
-```
-
-**Multiple focused reviews:**
-```
-/review-branch tests security
+/review-branch --base origin/develop tests security
+Review my branch with the build and packaging persona against origin/main.
 ```

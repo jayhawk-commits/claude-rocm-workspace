@@ -11,8 +11,9 @@ ROCm and review-system knowledge, but adapt Claude-specific mechanics to Codex:
   Treat requests like `/review-pr`, `/review-branch`, `/task`, and `/wip` as
   natural-language instructions, not as commands Codex can execute directly.
 - Claude subagents in `.claude/agents/` are specialist notes. Read them when
-  they match the task. Do not spawn Codex subagents unless the user explicitly
-  asks for delegated or parallel agent work.
+  they match the task. Use native delegation when independent work benefits
+  the task. For persona reviews, follow `skills/review-panel/SKILL.md` and its
+  bounded, source-read-only reviewer workflow.
 - Output styles under `.claude/output-styles/` are Claude-specific. Follow the
   user's current tone and the normal Codex response rules.
 
@@ -82,6 +83,14 @@ git -C C:\Dev\TheRock-pub ls-remote --exit-code origin HEAD
 
 For PR reviews, follow `reviews/README.md`, `reviews/REVIEW_GUIDELINES.md`, and
 `reviews/REVIEW_TYPES.md`.
+
+Use `skills/review-panel/SKILL.md` for requested persona/parallel reviews or
+substantive changes spanning multiple domains. Select relevant roles from
+`reviews/personas.md`; ordinary focused reviews remain lightweight. Resolve
+the actual base and record merge-base/head SHAs before dispatch, then check
+for source or PR head/base changes before delivering current inline comments.
+If present, use `LOCAL_CONTEXT.md` for optional reference routing only for a relevant domain;
+do not preload private knowledge or put private-derived details in reviews.
 
 - Fetch PR metadata with `gh pr view <URL> --json ...`.
 - Fetch diffs with `gh pr diff <URL>`.

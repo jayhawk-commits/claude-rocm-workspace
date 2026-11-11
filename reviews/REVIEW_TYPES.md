@@ -1,6 +1,10 @@
 # Review Types and Focus Areas
 
-This document defines different types of code reviews that can be performed, each focusing on specific aspects of code quality.
+These focus areas guide what to inspect; they do not set severity by themselves.
+Apply [REVIEW_GUIDELINES.md](REVIEW_GUIDELINES.md) for evidence, impact and output.
+For requested personas or substantive changes crossing domains, use the
+[review panel](../skills/review-panel/SKILL.md) and [persona selection](personas.md).
+Keep small focused reviews lightweight and load only relevant domain references.
 
 ---
 
@@ -68,14 +72,14 @@ A comprehensive review covers all aspects:
 
 **Focus:** Project conventions, readability
 
-**Reference:** [TheRock Style Guides](../../TheRock/docs/development/style_guides/)
+**Reference:** Read the active repository's authoritative conventions. For TheRock, use its [style guides](https://github.com/ROCm/TheRock/tree/main/docs/development/style_guides); verify the relevant section before citing it.
 
 **What it examines:**
 - Adherence to language-specific style guides:
-  - [Python Style Guide](../../TheRock/docs/development/style_guides/python_style_guide.md) - type hints, dataclasses, error handling, pathlib, etc.
-  - [CMake Style Guide](../../TheRock/docs/development/style_guides/cmake_style_guide.md)
-  - [Bash Style Guide](../../TheRock/docs/development/style_guides/bash_style_guide.md)
-  - [GitHub Actions Style Guide](../../TheRock/docs/development/style_guides/github_actions_style_guide.md)
+  - [Python Style Guide](https://github.com/ROCm/TheRock/blob/main/docs/development/style_guides/python_style_guide.md) - type hints, dataclasses, error handling, pathlib, etc.
+  - [CMake Style Guide](https://github.com/ROCm/TheRock/blob/main/docs/development/style_guides/cmake_style_guide.md)
+  - [Bash Style Guide](https://github.com/ROCm/TheRock/blob/main/docs/development/style_guides/bash_style_guide.md)
+  - [GitHub Actions Style Guide](https://github.com/ROCm/TheRock/blob/main/docs/development/style_guides/github_actions_style_guide.md)
 - Naming conventions (variables, functions, classes)
 - Code formatting and consistency
 - File organization
@@ -85,7 +89,7 @@ A comprehensive review covers all aspects:
 - Comments quality (not quantity)
 
 **Severity guidelines:**
-- ❌ BLOCKING: Violates established project patterns
+- ❌ BLOCKING: Violates a verified mandatory requirement with a concrete consequence
 - ⚠️ IMPORTANT: Hurts readability significantly
 - 💡 SUGGESTION: Minor style improvements
 
@@ -141,7 +145,7 @@ A comprehensive review covers all aspects:
 - Changelog updates
 
 **Severity guidelines:**
-- ❌ BLOCKING: Missing docs for public API changes
+- ❌ BLOCKING: Missing migration or contract information prevents correct use of a changed API
 - ⚠️ IMPORTANT: Complex code without explanation
 - 💡 SUGGESTION: Additional examples or clarification
 
@@ -171,7 +175,7 @@ A comprehensive review covers all aspects:
 - Future maintainability
 
 **Severity guidelines:**
-- ❌ BLOCKING: Violates fundamental architecture principles
+- ❌ BLOCKING: Breaks a required interface, dependency or ownership invariant
 - ⚠️ IMPORTANT: Creates technical debt or coupling issues
 - 💡 SUGGESTION: Alternative design approaches
 
@@ -202,8 +206,8 @@ A comprehensive review covers all aspects:
 - Permission checks
 
 **Severity guidelines:**
-- ❌ BLOCKING: Any security vulnerability
-- ⚠️ IMPORTANT: Potential security concerns
+- ❌ BLOCKING: A supported vulnerability has a reachable trigger and concrete impact
+- ⚠️ IMPORTANT: A supported concern merits correction; label unconfirmed concerns as evidence gaps
 - 💡 SUGGESTION: Defense-in-depth improvements
 
 **When to use:**
@@ -233,7 +237,7 @@ A comprehensive review covers all aspects:
 - Profiling concerns
 
 **Severity guidelines:**
-- ❌ BLOCKING: Performance regression in critical path
+- ❌ BLOCKING: A supported regression materially harms a relevant critical path
 - ⚠️ IMPORTANT: Inefficient algorithms with better alternatives
 - 💡 SUGGESTION: Optimization opportunities
 
@@ -247,136 +251,32 @@ A comprehensive review covers all aspects:
 
 ## Review Output Format
 
-### Focused Review Structure
+Use the concise template in
+[REVIEW_GUIDELINES.md](REVIEW_GUIDELINES.md#review-structure-template) for every
+focus area. Record the actual base, merge-base and head SHAs and the reviewed
+scope. Lead with supported findings in severity order and a recommendation to
+approve, request changes, or wait for specific evidence.
 
-```markdown
-# [Review Type] Review: [branch-name]
-
-**Branch:** `branch-name`
-**Review Type:** [Style/Tests/Documentation/Architecture/Security/Performance]
-**Reviewed:** YYYY-MM-DD
-
----
-
-## Summary
-
-[Brief overview of findings from this perspective]
-
----
-
-## Overall Assessment
-
-**Status:** ✅ APPROVED / ⚠️ CHANGES REQUESTED / 🚫 REJECTED
-
-**Key Findings:**
-- [Summary of main issues from this focus area]
-
----
-
-## Detailed Findings
-
-### ❌ BLOCKING Issues
-[Issues that must be fixed]
-
-### ⚠️ IMPORTANT Issues
-[Issues that should be fixed]
-
-### 💡 SUGGESTIONS
-[Optional improvements]
-
----
-
-## Recommendations
-
-### Required Actions:
-1. [Specific blocking issues to fix]
-
-### Recommended Actions:
-1. [Important improvements]
-
-### Optional Improvements:
-1. [Suggestions]
-
----
-
-## Conclusion
-
-[Summary and next steps]
-```
-
-### Multi-Focus Review Structure
-
-When multiple review types run in parallel, they're combined into sections:
-
-```markdown
-# Code Review: [branch-name]
-
-**Branch:** `branch-name`
-**Review Types:** Style, Tests, Documentation
-**Reviewed:** YYYY-MM-DD
-
----
-
-## Overall Summary
-
-[High-level summary across all review types]
-
-**Status:** ✅ APPROVED / ⚠️ CHANGES REQUESTED / 🚫 REJECTED
-
----
-
-## Style Review
-
-[Style-focused findings]
-
----
-
-## Test Coverage Review
-
-[Test-focused findings]
-
----
-
-## Documentation Review
-
-[Documentation-focused findings]
-
----
-
-## Combined Recommendations
-
-### ❌ REQUIRED (Blocking):
-[All blocking issues from all review types]
-
-### ✅ Recommended:
-[All important issues from all review types]
-
-### 💡 Consider:
-[All suggestions from all review types]
-
----
-
-## Conclusion
-
-[Overall assessment and next steps]
-```
-
----
+For panel reviews, the coordinator reconciles and deduplicates findings into one
+report; raw persona reports stay in the local run directory. Preserve substantive
+disagreements and verification gaps. Separate reviewers or multiple models do not
+replace source, test or CI evidence. A failed or skipped review cannot count as
+approval. Keep path/line coordinates outside the concise posting-comment blocks.
 
 ## Tips for Effective Reviews
 
-### For the Reviewer (Claude)
+### For the Reviewer
 
 1. **Stay focused:** When doing a focused review, ignore issues outside that scope
 2. **Be thorough:** Within the focus area, be comprehensive
 3. **Provide context:** Explain why something matters from this perspective
-4. **Run in parallel:** Multiple focused reviews can run simultaneously
+4. **Select relevant reviewers:** Use the bounded panel when independent perspectives help
 5. **Cross-reference:** Note when issues overlap between focus areas
 
 ### For the Requester (Human)
 
 1. **Choose appropriate type:** Match review type to the change nature
-2. **Use parallel reviews:** Run multiple types for comprehensive coverage
+2. **Use parallel reviews selectively:** Match the panel to actual domain boundaries
 3. **Sequence reviews:** Do style/tests first, then architecture
 4. **Save bandwidth:** Don't run all review types for trivial changes
 5. **Iterate:** Fix blocking issues, then run focused reviews again
@@ -391,7 +291,7 @@ When multiple review types run in parallel, they're combined into sections:
 "Run architecture, tests, and documentation reviews in parallel"
 ```
 
-This ensures:
+This examines:
 - Design is sound (architecture)
 - Feature is properly tested (tests)
 - Feature is properly documented (documentation)
@@ -402,7 +302,7 @@ This ensures:
 "Run tests and security reviews in parallel"
 ```
 
-This ensures:
+This examines:
 - Fix is tested including edge cases (tests)
 - Fix doesn't introduce vulnerabilities (security)
 
@@ -423,7 +323,7 @@ Focuses on:
 "Run performance and tests reviews in parallel"
 ```
 
-This ensures:
+This examines:
 - Optimization is effective (performance)
 - Optimization doesn't break functionality (tests)
 

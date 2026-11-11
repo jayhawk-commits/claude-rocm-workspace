@@ -203,14 +203,14 @@ with _open_archive_for_read(Path('<archive.tar.zst>')) as tf:
 
 ### Coding Standards
 
-**Follow the style guides in [TheRock/docs/development/style_guides/](../TheRock/docs/development/style_guides/):**
+**For TheRock changes, follow the [public style guides](https://github.com/ROCm/TheRock/tree/main/docs/development/style_guides), checking the version in the target checkout when relevant:**
 
 | Guide | Use For |
 |-------|---------|
-| [Python Style Guide](../TheRock/docs/development/style_guides/python_style_guide.md) | All Python code |
-| [CMake Style Guide](../TheRock/docs/development/style_guides/cmake_style_guide.md) | CMake build configuration |
-| [Bash Style Guide](../TheRock/docs/development/style_guides/bash_style_guide.md) | Shell scripts |
-| [GitHub Actions Style Guide](../TheRock/docs/development/style_guides/github_actions_style_guide.md) | CI/CD workflows |
+| [Python Style Guide](https://github.com/ROCm/TheRock/blob/main/docs/development/style_guides/python_style_guide.md) | Python code |
+| [CMake Style Guide](https://github.com/ROCm/TheRock/blob/main/docs/development/style_guides/cmake_style_guide.md) | CMake build configuration |
+| [Bash Style Guide](https://github.com/ROCm/TheRock/blob/main/docs/development/style_guides/bash_style_guide.md) | Shell scripts |
+| [GitHub Actions Style Guide](https://github.com/ROCm/TheRock/blob/main/docs/development/style_guides/github_actions_style_guide.md) | CI/CD workflows |
 
 Key principles across all languages:
 
@@ -368,6 +368,17 @@ Do a security review of my branch
 - `📋 FUTURE WORK` - Out of scope for this PR
 
 **Documentation:** See `reviews/README.md` for full details.
+
+For requested persona/parallel reviews or substantive changes spanning domains,
+use `skills/review-panel/SKILL.md` and select roles from `reviews/personas.md`.
+Keep ordinary focused reviews lightweight. The shared skill uses native agent
+delegation, preserves exact source revisions, and reconciles evidence before
+producing our normal review output. Review workers do not edit source or publish.
+Current user review defaults and evidence-based impact take precedence over
+older blanket severity examples in domain checklists.
+For a domain review needing authorized private references, read
+`LOCAL_CONTEXT.md` if present and follow its local routing; do not preload it
+for unrelated work or copy private context into shared review artifacts.
 
 #### Inline Reviews (Quick Iteration)
 

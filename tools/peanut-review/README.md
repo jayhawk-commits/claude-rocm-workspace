@@ -1,0 +1,812 @@
+# peanut-review
+
+> Modified for claude-rocm-workspace: use [Local setup](LOCAL_SETUP.md) for the
+> supported WSL profile and shared personas. The upstream reference below includes
+> other runners and publishing commands outside that profile; see [provenance](UPSTREAM.md).
+
+Structured code review for humans and agents, with a CLI, JSONL session data,
+and a browser UI.
+
+## TL;DR
+
+Run from this checkout:
+
+```bash
+PEANUT_REVIEW_DIR=$PWD
+PR_BIN=$PEANUT_REVIEW_DIR/bin/peanut-review
+"$PR_BIN" --help
+```
+
+Use `peanut-review` instead of `$PR_BIN` if it is installed on `PATH`.
+Most flows run from the repo being reviewed, so keep `PR_BIN` absolute.
+Set `PR_PYTHON` to select the Python interpreter for either bundled launcher;
+the web launcher otherwise prefers its `.venv/bin/python`, then `python3`.
+Both launchers import this checkout through `PYTHONPATH`.
+
+In `claude-workspace`, use `skills/peanut-review/` to orchestrate multi-agent
+review sessions and `tools/peanut-review/bin/peanut-review` as the CLI.
+
+### GitHub accounts
+
+One web server can publish reviews using several accounts, including accounts
+on the same GitHub host. Each GitHub session saves its hostname, login, and
+verified user ID. Authenticate each account with `gh auth login`, then select
+an account when creating a session:
+
+```bash
+"$PR_BIN" start https://github.com/owner/repo/pull/123 --gh-account work-login --no-launch
+```
+
+Alternatively, set a default in the checkout being reviewed:
+
+```bash
+git config --local peanut-review.githubAccount work-login
+```
+
+Git `includeIf` configuration is supported, so different checkout directories
+can have different defaults. The explicit `--gh-account` flag takes precedence.
+The saved session identity is used for `start --reuse`, `sync-pr`, imports,
+comments, replies, edits, and verdicts, even if the repository default changes.
+A bare PR number is resolved from the checkout's `origin` remote locally. Use a
+full PR URL for a different target repository, or `--gh-host` to specify the
+actual GitHub hostname when origin uses an SSH alias.
+
+Bind an existing session explicitly before using its GitHub operations:
+
+```bash
+"$PR_BIN" --session /path/to/session gh-auth --account work-login
+"$PR_BIN" --session /path/to/session gh-auth
+```
+
+The first command verifies the account and PR access before saving a binding;
+the second verifies the saved identity. Bound sessions cannot be reassigned to
+a different account; create a new session when a different author is needed.
+Existing local review data remains readable without a binding.
+
+For a second account on the same PR, provide a unique `--id` so the new session
+does not collide with the existing session's generated name:
+
+```bash
+"$PR_BIN" start https://github.com/owner/repo/pull/123 \
+  --gh-account public-login --id repo-pr-123-public-login --no-launch
+```
+
+To reuse that session later, pass the same `--id` with `--reuse`, or select its
+path with `--session`. Session IDs must also differ when separate repositories
+or hosts would otherwise generate the same name.
+
+For each operation, peanut-review retrieves the selected account's stored token
+with `gh auth token --hostname HOST --user LOGIN`, verifies it with `gh api user`,
+and uses that same token for every request in the operation. It overrides
+inherited token/host settings only in those subprocesses, without changing the
+active `gh` account or the server environment. Tokens stay in memory and child
+process environments; they are never saved to sessions or sent to the browser.
+The server must be able to access the selected accounts in its gh credential
+store. If credentials expire or disappear, authenticate that account again;
+peanut-review never falls back to the active account.
+
+Both CLI dry-runs and the web publish preview show the verified account and
+target. The web server revalidates credentials on submission and rejects a
+changed account or target. Missing bindings, unavailable credentials, and an
+unexpected login or user ID block publishing. Updating the server to this
+version requires restarting it from the updated tool checkout.
+
+## Web UI
+
+Start the server from this tool checkout:
+
+```bash
+bin/peanut_review_serve.sh
+```
+
+Defaults: `root=$HOME/reviews`, `port=27183`, and a root-mounted UI. The
+launcher binds to `0.0.0.0` in Docker and `127.0.0.1` otherwise. Open
+`http://127.0.0.1:27183/` through the Docker/SSH port forwarding path.
+
+The shared `claude-workspace` configuration stores sessions under
+`.cache/peanut-review/sessions/`. Start its UI from the workspace root with the
+same root explicitly selected:
+
+```bash
+PR_ROOT="$PWD/.cache/peanut-review/sessions" \
+  tools/peanut-review/bin/peanut_review_serve.sh
+```
+
+Keep `PR_ROOT` aligned with the config's `reviewRoot`; otherwise the CLI and UI
+will show different session sets. If `<PR_ROOT>/.queue/config.json` exists, the
+server automatically enables the review queue using that local configuration.
+An explicit `--queue-config` selects a different file. To reach the UI through the development
+container, enable its forwarding when launching the container:
+
+```bash
+DOCKER_ENABLE_PEANUT_REVIEW_WEB=1 ./projects/docker/run_docker.sh
+```
+
+The Docker launcher's `init_docker.sh` publishes port `27183` only on the SSH
+host's loopback when this option is enabled, so VSCode Remote SSH can forward
+it without exposing the UI externally. When attached directly to the container,
+you can instead forward its port through the editor's Ports panel. Set
+`PR_HOST` or `PR_PORT` only to override the normal bind or port. Set
+`PR_BASE_URL` only when a reverse proxy removes that same path prefix before
+forwarding requests.
+
+### Optional browser profiling
+
+The runtime has no browser dependency. For repeatable local performance
+measurements, install Playwright in a disposable virtual environment and run
+the optional profiler against either the direct server or the Caddy mount:
+
+```bash
+python -m venv /tmp/peanut-review-profiler
+/tmp/peanut-review-profiler/bin/pip install playwright
+/tmp/peanut-review-profiler/bin/playwright install chromium
+
+/tmp/peanut-review-profiler/bin/python scripts/profile_web.py \
+  --url http://127.0.0.1:27183/example-session/ \
+  --url http://127.0.0.1:27182/pr/example-session/ \
+  --runs 3 --output /tmp/peanut-review-profile.json
+```
+
+The JSON report records medians plus every run: response start,
+DOMContentLoaded, main-thread task, layout and style time, long tasks,
+transferred bytes, DOM shape, bottom-scroll cost, and steady-state polling
+bytes and CPU. Compare medians from the same machine, browser build, server
+mount, session snapshot, and run count.
+
+## Copy/Paste Prompts
+
+First-time project setup:
+
+```text
+Help me set up peanut-review for this repo. Inspect the checkout/worktree
+layout, ask before choosing reviewRoot, workspaceRoot, repoRelative, reviewers,
+runners, models, or build/test commands, then generate .peanut-review.json and
+run dry-run validation. Do not launch reviewers yet.
+```
+
+One-time review queue setup:
+
+```text
+/peanut-review setup-queue
+Set up the local queue config from the canonical checkouts under projects/ and
+projects-emu/ and the authenticated GitHub identities. Preserve existing account
+bindings and reviewer config; ask only about unresolved account/repository
+mappings. Validate the config and show the dashboard startup command.
+```
+
+See [one-time queue setup](#one-time-queue-setup) for the manual steps and a
+fictional public/EMU example. `setup-queue` is a skill routing hint, not a CLI
+subcommand.
+
+GitHub PR orchestration:
+
+```text
+Set up peanut-review for <PR URL> under <review-root>. Use the existing
+.peanut-review.json, confirm the exact reviewer lineup and runner/model choices
+before launching. Reuse the PR's branch-backed development worktree under
+projects/worktrees, creating one there if needed, then start with --no-launch
+so I can build/test the checkout. Do not create a separate detached review
+worktree. After reviewers signal round-done, wait-all should run the curator;
+help me inspect the curated feedback for the web UI push flow.
+```
+
+Local author-owned review:
+
+```text
+Run a local peanut-review session for the current branch under <review-root>.
+Use base <base-ref>, topic HEAD, and the configured reviewers. Launch reviewers,
+triage every finding, apply fixes, migrate comment anchors, and run one rebuttal
+round if useful.
+```
+
+Update an existing GitHub-backed session:
+
+```text
+Update peanut-review session <SESSION> after the PR changed. Update or recreate
+the branch-backed development worktree through the normal development flow,
+then run sync-pr and gh-pull and show new/unresolved comments. Preserve local
+changes rather than discarding them. Do not create a separate detached review
+worktree or launch agents unless the update is substantial or I explicitly
+ask.
+```
+
+After `.peanut-review.json` exists, future PR/session setup is a good task to
+delegate to a subagent. Keep the first setup interactive so roots, permissions,
+reviewers, and model choices are intentional.
+
+## Project Config
+
+Outside a preconfigured workspace, GitHub PR flow usually starts from a
+`.peanut-review.json` in the worktree parent or repo:
+
+```json
+{
+  "reviewRoot": "$HOME/reviews",
+  "workspaceRoot": "$HOME/src",
+  "repoRelative": "my-repo",
+  "reviewAgentTimeoutSeconds": 1200,
+  "agents": [
+    {"name": "Vera", "model": "gpt-6-astra", "reasoningEffort": "xhigh", "persona": "vera.md", "runner": "codex"},
+    {"name": "Irene", "model": "claude-opus-5-5-xhigh", "persona": "irene.md", "runner": "cursor"},
+    {"name": "Felix", "model": "grok-4.7-xhigh", "persona": "felix.md", "runner": "cursor"},
+    {"name": "Curator", "model": "gpt-6-astra", "reasoningEffort": "xhigh", "runner": "codex", "role": "curator"}
+  ]
+}
+```
+
+In `claude-workspace`, do not create another repository-local config. Use the
+shared `.cache/peanut-review/.peanut-review.json`; it resolves the reviewed
+repository from the current working directory and stores sessions under
+`.cache/peanut-review/sessions/`. Name GitHub sessions
+`<repo>-pr-<number>-<change>`. Because the shared config is outside development
+worktrees, pass its absolute path with `--config`.
+
+Supported runners: `cursor`, `opencode`, `codex`.
+Each agent selects its own runner and model, so one session can mix them.
+For Cursor, use an exact model ID from `cursor-agent --list-models` and verify
+authentication with `cursor-agent status`. Cursor model IDs can include the
+effort level, such as `grok-4.7-xhigh` or `claude-opus-5-5-xhigh`.
+Remove `reasoningEffort` and `fastMode` when switching an entry to Cursor;
+both settings are supported only by the Codex runner.
+Codex agents accept an optional per-agent `fastMode` boolean. It defaults to
+`false`; set it to `true` to enable Codex fast mode for a specific agent.
+GitHub PR sessions require a configured agent with `"role": "curator"` because
+the curator model is intentionally owned by project config, not by Python
+defaults.
+
+Agent configuration is copied into each new session. Editing the shared config
+affects new sessions; `launch`, `rerun`, and `curate` on existing sessions retain
+their saved agents.
+
+Cursor runners need permissions in the actual reviewed workspace before
+`launch`, including each new worktree. A `.cursor/cli.json` in the enclosing
+meta workspace does not satisfy the launch check. If the worktree has no config:
+
+```bash
+mkdir -p "$WORKSPACE/.cursor"
+if [ ! -e "$WORKSPACE/.cursor/cli.json" ]; then
+  cp "$PEANUT_REVIEW_DIR/peanut_review/templates/cli.sample.json" \
+    "$WORKSPACE/.cursor/cli.json"
+fi
+```
+
+Preserve existing permissions when a config is already present. Ensure its
+allow list includes `Shell(peanut-review **)`, its deny list is non-empty,
+and its deny list does not contain `Shell(**)`. Run `launch --dry-run` before
+the first mixed-runner launch to check the session configuration and permissions.
+
+Cursor prompts include the shared user guidance from `~/.codex/AGENTS.md`
+(or `$CODEX_HOME/AGENTS.md`) when present. This is loaded on each launch before
+Cursor switches to its private runtime home; `~/` paths in the guidance are
+expanded to the user's actual home so reference checkouts remain discoverable.
+SSH Cursor reviewers use the remote user's guidance and home directory.
+
+Selected reviewer agents can instead use an existing persistent SSH
+ControlMaster, an independent remote checkout/build tree, and a reverse-forwarded
+capability gateway while retaining the same reviewer CLI. Curator, web, and
+GitHub operations remain local. See [SSH reviewers](docs/ssh-reviewers.md) for
+the configuration, security boundary, lifecycle, and real localhost validation.
+
+### Prompt context
+
+Every GitHub-backed reviewer and curator prompt includes the saved PR title,
+full description, repository/number, and URL. This also applies to custom
+templates, reruns, automatic curation, and SSH reviewers. Author-supplied text
+is marked as review context whose claims need verification.
+
+`start` and `init --gh-pr` capture this metadata. `sync-pr` or
+`start --reuse --sync` refresh it, including description-only changes. Launching
+agents renders the saved metadata without fetching GitHub. Older sessions show
+that the description was not captured until synchronized; an empty GitHub
+description is identified separately. Local sessions without a PR omit this
+section. Existing prompt files and running agents are unchanged until the next
+launch or rerun.
+
+The default reviewer prompt also includes workspace/repository paths and layout,
+detected build directories, compilation database and venv paths, diff commands,
+and a command to read the copied persona file. It tells reviewers to load prior
+comments/rebuttals, post structured findings, run relevant tests and report them,
+and signal completion. The default curator prompt includes workspace/repository
+paths, the reviewer lineup and curation baseline, commands to read visible and
+deleted comments and preview GitHub publication, and rules for validating,
+deduplicating, rewriting, and reporting curation decisions.
+
+Diffs, source files, persona contents, and comment history are read by the agents
+using those commands; they are not embedded in the prompt. Agent reports/notes
+are not automatically included or requested. Custom templates replace the role
+instructions; the launcher still appends PR metadata and optional local context.
+Rendered prompts are saved in `<session>/prompts/<Agent>.md`.
+
+### Local reference context
+
+Put optional local instructions and reference routing in `LOCAL_CONTEXT.md` at
+the enclosing workspace root. This workspace's `.gitignore` excludes the file.
+The launcher finds it directly in the runner workspace or its parents; no
+separate path setting is needed. The nearest file wins, and an empty file
+disables inherited context for that subtree.
+
+Each local reviewer and curator prompt receives the resolved absolute path and
+an instruction to read it once and follow its routing to relevant references.
+This applies to custom templates, reruns, and automatic curation; existing
+sessions discover the current file on their next launch. Reference contents stay
+in their original files. Follow their routing and private-material handling rules.
+
+Missing context does not block launch; an unreadable nearest file disables
+context for that subtree. SSH reviewer prompts omit local context paths.
+Use `launch --dry-run` or `curate --dry-run` while the selected agents are idle
+to inspect the rendered prompts.
+
+## Flow: GitHub PR
+
+Use this for changes that came from GitHub.
+
+In `claude-workspace`, run from the branch-backed development worktree under
+`projects/worktrees/<repo>/` that owns the PR. Reuse that worktree for review
+and subsequent fixes; do not create a detached review checkout under
+`.cache/peanut-review/`. Before launching reviewers, confirm committed `HEAD`
+is the intended snapshot and preserve any uncommitted work.
+
+```bash
+PR=https://github.com/owner/repo/pull/123
+CONFIG=<path-to-.peanut-review.json>
+
+# Run inside the target checkout. Config discovery walks upward from cwd.
+# Keep --config when the selected config is outside the checkout.
+
+# Update an existing PR worktree without discarding local changes.
+gh pr co "$PR"
+
+"$PR_BIN" start "$PR" --config "$CONFIG" --no-launch
+SESSION=<printed-session-path>
+
+# Build/test the checkout with the repo's normal commands.
+
+"$PR_BIN" --session "$SESSION" launch --dry-run
+"$PR_BIN" --session "$SESSION" launch
+"$PR_BIN" --session "$SESSION" wait-all round-done --timeout 900
+```
+
+`wait-all round-done` reports changing completion counts, such as
+`::group::3/4 reviewers (1 failed)`, and a `::group::Curator` transition.
+Each progress update closes the previous group; a failed phase remains open
+so a calling tool can attribute the failure. Terminal reviewer and curator
+failures are reported without waiting for a missing signal until the deadline.
+
+For GitHub-backed sessions, `wait-all round-done` waits for reviewers, then
+launches the dedicated `Curator` agent and waits for it to finish. Inspect the
+curated result in the web UI, then use the UI's GitHub push modal when ready:
+
+```bash
+"$PR_BIN" --session "$SESSION" gh-pull
+"$PR_BIN" --session "$SESSION" comments --unresolved
+"$PR_BIN" --session "$SESSION" edit c_1234abcd --body-file /tmp/comment.md
+"$PR_BIN" --session "$SESSION" delete c_9999ffff
+```
+
+The curator prepares an `approve` review with `LGTM` when all existing
+substantive findings are addressed and the completed review of the current
+head finds no new substantive issues. Useful naming and organization feedback
+can be substantive; optional polish can remain alongside approval. The curator
+checks imported and historical findings and previews with `gh-push --dry-run`.
+Approvals stay local for the human user to publish through the web UI or CLI.
+
+`wait-all round-done --max-reviewer-failures N` tolerates up to N reviewers
+finishing without a `round-done` signal. It waits for every reviewer to finish
+before curation, reports the failed reviewers, and still fails if any reviewer
+remains unfinished at the deadline or Curator fails. At least one reviewer must
+succeed. The default is zero tolerated failures. Allowing curation after a
+partial reviewer failure does not certify a complete review in the dashboard:
+all configured reviewers and a subsequent curator must still succeed on the
+same snapshot. Failed or incomplete reviews must not receive an LGTM approval.
+
+When **curate** finds that its recorded PR worktree is missing, it reuses the
+saved local branch's worktree if that branch has moved to another directory.
+Otherwise it restores the branch at the original source path using retained
+Git storage. Recovery never creates a detached checkout inside session storage.
+An existing checkout or branch at a different revision, a dirty replacement
+worktree, or live session agents blocks recovery: preserve local work and
+synchronize the existing PR worktree before curating. Saved commits, comments,
+PR account identity and reviewer configuration stay unchanged.
+
+Recovery restores source only. Existing wrapper configuration and build output
+are preserved, but missing build environments or Cursor permissions must be
+prepared before launch. Older sessions without retained Git storage first need
+`retain-git --repo <surviving-repository>`. A legacy session without a recorded
+local branch can use its PR head branch when available; otherwise synchronize
+it to the existing branch-backed PR worktree to record that identity.
+
+The web UI also exposes manual **curate** and **rerun all** controls in the
+Agents section when you need to rerun comment curation or start a fresh
+reviewer pass.
+
+## Flow: Local Branch
+
+Use this when you own the patch and want reviewers to find issues before you
+ship it.
+
+```bash
+REVIEW_ROOT=$HOME/reviews
+SESSION=$REVIEW_ROOT/my-repo-my-branch
+WORKSPACE=$PWD
+AGENTS='[
+  {"name":"Vera","model":"gpt-5.5","persona":"vera.md","runner":"codex"},
+  {"name":"Irene","model":"claude-opus-4-7-thinking-medium","persona":"irene.md","runner":"cursor"},
+  {"name":"Curator","model":"gpt-5.5-high","runner":"cursor","role":"curator"}
+]'
+
+"$PR_BIN" --session "$SESSION" init \
+  --workspace "$WORKSPACE" \
+  --base origin/main \
+  --topic HEAD \
+  --agents "$AGENTS"
+
+"$PR_BIN" --session "$SESSION" launch --dry-run
+"$PR_BIN" --session "$SESSION" launch
+"$PR_BIN" --session "$SESSION" wait-all round-done --timeout 900
+"$PR_BIN" --session "$SESSION" comments --unresolved
+```
+
+Local sessions do not run the curator automatically. If you want comment
+cleanup before fixing the patch, use the web UI's **curate** button or:
+
+```bash
+"$PR_BIN" --session "$SESSION" curate
+```
+
+After fixing code:
+
+```bash
+"$PR_BIN" --session "$SESSION" comments --unresolved
+COMMENT_ID=c_1234abcd
+
+"$PR_BIN" --session "$SESSION" resolve "$COMMENT_ID"
+"$PR_BIN" --session "$SESSION" migrate
+"$PR_BIN" --session "$SESSION" rerun --agent Vera --agent Irene
+"$PR_BIN" --session "$SESSION" wait-all round-done --timeout 900
+"$PR_BIN" --session "$SESSION" verdict --approve --body "All critical issues addressed"
+```
+
+## Flow: PR Updated
+
+Use this after the author pushes a new revision.
+
+```bash
+# First update the branch-backed checkout. Preserve local changes and resolve
+# divergence through the normal development workflow rather than force-resetting.
+gh pr co "$PR"
+
+"$PR_BIN" --session "$SESSION" sync-pr
+"$PR_BIN" --session "$SESSION" gh-pull
+"$PR_BIN" --session "$SESSION" comments --since "$LAST_COMMENT_ID"
+```
+
+Session base/head refs are stored as commit SHAs. Opening the web UI never
+retargets them: if the checkout has moved, the page reports that the workspace
+differs until `sync-pr` (GitHub sessions) or `migrate` (local sessions) is run
+explicitly. Agent launch/rerun is refused for a GitHub session while its
+workspace is checked out at a different commit.
+
+New and synchronized sessions record `git_common_dir` separately from the
+execution `workspace` and `repo_relative`. Pinned diffs, folded source context,
+and GitHub comment anchors read the shared Git directory, so linked worktrees
+can be recycled without breaking saved reviews. Session-specific refs under
+`refs/peanut-review/` retain reviewed commits, including earlier revisions,
+against Git garbage collection. Keep the shared repository available; these
+refs are not automatically pruned when session directories are deleted.
+
+To repair an older session whose worktree has already been removed, supply a
+surviving repository containing its recorded commits:
+
+```bash
+"$PR_BIN" --session "$SESSION" retain-git --repo /path/to/main/repository
+```
+
+This updates durable Git storage without changing the execution workspace,
+reviewed commits, comments, or agent configuration. Reviewer reruns still need
+a valid execution checkout; synchronize a replacement workspace before rerunning.
+
+Rerun agents only for substantial changes. Use `rerun`, not `launch`, so stale
+round signals are cleared before the selected reviewers start:
+
+```bash
+"$PR_BIN" --session "$SESSION" rerun --agent Vera --agent Irene
+"$PR_BIN" --session "$SESSION" wait-all round-done --timeout 900
+```
+
+## Common Commands
+
+```bash
+"$PR_BIN" --session "$SESSION" status
+"$PR_BIN" --session "$SESSION" note --message "Ran targeted tests; passed."
+"$PR_BIN" --session "$SESSION" add-comment --file path/to/file.py --line 42 --body-file /tmp/body.md
+"$PR_BIN" --session "$SESSION" comments --unresolved   # use this to find c_... ids
+"$PR_BIN" --session "$SESSION" curate                 # launch the comment curator
+"$PR_BIN" --session "$SESSION" add-global-comment --body "A few comments."
+"$PR_BIN" --session "$SESSION" add-global-comment --category request-changes --body-file /tmp/blocking.md
+"$PR_BIN" --session "$SESSION" add-comment --reply-to <global-comment-id> --body "Response"
+```
+
+Replies to anchored comments remain in their GitHub thread. Because GitHub
+does not support threading review-level comments, replying to a global comment
+creates a new global comment that quotes the original body as a Markdown
+blockquote before the response.
+
+Comments describe impact and uncertainty in prose; severity fields, filters,
+CLI flags and web badges have been retired. Review categories (`comment`,
+`approve`, `request-changes`) still control GitHub review decisions. Existing
+sessions remain readable. Reads leave stored JSONL untouched; the first rewrite
+of a legacy comment file saves its original bytes in a sibling
+`<author>.jsonl.pre-severity-removal` backup before dropping severity metadata,
+including historical severity fields. New commands must omit `--severity`.
+
+Reviewer scratch files, drafts, standalone test programs and new caches belong
+under an agent-specific `<session>/tmp/` directory; the curator uses
+`<session>/tmp/curator/`. Existing build directories remain usable. Lisa, Irene
+and Merlin can record an explicit out-of-scope note and finish without running
+tests when their persona's domain does not apply. A scope skip is not an approval.
+
+`note` is a report-only channel for non-review output such as test execution
+and comment curation. Review findings and discussion belong in comments.
+Review progress is derived from reviewer and Curator runtime status. Sessions
+do not have a separate lifecycle state: `round-done` records an agent's
+completion, while `result.json` records an optional verdict without preventing
+later reruns.
+There is no interactive agent help channel: blocked reviewers record a
+`Review Blocked` report when possible, exit without `round-done`, and are
+rerun after the environment is fixed. Comment-thread replies remain available
+through `add-comment --reply-to`.
+
+## Review queue
+
+The **Review queue** tab discovers open PRs requested from each configured
+GitHub account, including team requests. It shares the existing server and
+session pages. PRs remain tracked after review submission, but explicitly
+removing your review request (or your team's request) hides the PR once no
+request remains for you. A new request brings it back. Existing review sessions
+and history are preserved on the session pages. Closed PRs are available through
+**Include closed PRs**. Account failures retain cached rows and show an error.
+
+The request-type filter defaults to **Direct request**, and the review-status
+filter defaults to **All open PRs**. Select **Team request**
+or **All request types** as needed, alongside the account, search, and
+review-status filters. Direct and team categories retain
+the request origin after review submission. Historical requests are recovered
+from the PR timeline; team requests must match a team of the selected account.
+Direct takes precedence when both apply. Tracked PRs without a known request
+origin show **No known request** and remain visible under **All request types**.
+The separate **Review requested** status filter still selects pending requests.
+History or membership lookup
+failures appear on the row and are retried without discarding known origins.
+
+### One-time queue setup
+
+Configure the queue once per machine, then update it when accounts or checkout
+locations change. Run discovery in the same environment and OS account as the
+web server so its `gh` credential store and filesystem paths are available.
+
+1. **Locate the existing config and session root.** In `claude-workspace`, the
+   tracked `.cache/peanut-review/.peanut-review.json` selects reviewers, models,
+   runners, and `reviewRoot`. The separate, gitignored queue config selects
+   GitHub accounts and checkout mappings. Save it at
+   `<primary-session-root>/.queue/config.json` for automatic loading, or preserve
+   the running server's explicit `--queue-config` path. Read an existing queue
+   config before editing and merge additions without replacing saved choices.
+   Keep the server's `--root` aligned with the reviewer config's `reviewRoot`.
+
+   These variables assume the standard workspace layout; adjust them to the
+   discovered paths. Use an absolute tool path from the checkout containing the
+   queue implementation if it differs from the main workspace checkout.
+
+   ```bash
+   META_WORKSPACE="$HOME/claude-workspace"
+   PEANUT_REVIEW_DIR="$META_WORKSPACE/tools/peanut-review"
+   PR_BIN="$PEANUT_REVIEW_DIR/bin/peanut-review"
+   REVIEW_CONFIG="$META_WORKSPACE/.cache/peanut-review/.peanut-review.json"
+   PR_ROOT="$META_WORKSPACE/.cache/peanut-review/sessions"
+   QUEUE_CONFIG="$PR_ROOT/.queue/config.json"
+   ```
+
+2. **Discover stored GitHub identities.** List all stored accounts, including
+   inactive accounts on the same host. Ignore inherited token overrides during
+   discovery, as the queue retrieves credentials for each selected login:
+
+   ```bash
+   env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN \
+     gh auth status --json hosts \
+     --jq '.hosts | to_entries[] | .key as $host | .value[] | {hostname: $host, login, active, state}'
+   ```
+
+   Inspect each account's status; JSON mode can exit successfully even when an
+   account has authentication errors. If a required identity is missing or
+   expired, authenticate it with `gh auth login --hostname <host>`, then repeat
+   discovery. Use the exact login and real GitHub hostname. Public and EMU
+   identities can both be on `github.com`; an SSH alias is not a GitHub hostname.
+   No `gh auth switch` is needed. Never copy tokens into either config.
+
+3. **Inventory canonical checkouts and map identities.** From the workspace
+   root, inspect `projects/<repo>/` and `projects-emu/<organization>/<repo>/`,
+   excluding both `worktrees/` trees. This read-only inventory prints local
+   paths, remotes, and effective account defaults, including Git `includeIf`:
+
+   ```bash
+   for checkout in "$META_WORKSPACE"/projects/* "$META_WORKSPACE"/projects-emu/*/*; do
+     case "$checkout" in
+       "$META_WORKSPACE"/projects/worktrees|"$META_WORKSPACE"/projects-emu/worktrees/*) continue ;;
+     esac
+     [ -e "$checkout/.git" ] || continue
+     git -C "$checkout" rev-parse --show-toplevel
+     git -C "$checkout" remote -v
+     git -C "$checkout" config --show-origin --get peanut-review.githubAccount || true
+   done
+   ```
+
+   Derive `owner/repo` from the remote for the repository receiving PRs. Check
+   `upstream` as well as `origin` when the checkout is a fork; the directory name
+   alone is not a repository identity. Preserve saved queue mappings and session
+   bindings, and use `peanut-review.githubAccount` to fill missing mappings.
+   Resolve conflicts or ambiguous accounts with the user; do not infer a GitHub
+   login from Git author email, SSH username, or whichever account is active.
+   If both identities intentionally review the same repository, map it under
+   both account entries. The queue uses these entries independently.
+
+   Record explicit `path` and repository-specific `worktreeRoot` for each
+   included checkout. Public paths use `projects/<repo>/` and
+   `projects/worktrees/<repo>/`; EMU paths use
+   `projects-emu/<organization>/<repo>/` and
+   `projects-emu/worktrees/<organization>/<repo>/`. These roots contain task
+   worktrees; do not point `path` at a temporary PR worktree.
+
+Keep the inventory and real config local and gitignored. Do not paste internal
+repository names, remotes, paths, or queue output into tracked documentation or
+public artifacts. All names and logins in this example are fictional; replace
+them only in your local config:
+
+```json
+{
+  "pollSeconds": 120,
+  "accounts": [
+    {
+      "hostname": "github.com",
+      "login": "my-public-login",
+      "label": "Public",
+      "cloneRoot": "$HOME/claude-workspace/projects",
+      "worktreeRoot": "$HOME/claude-workspace/projects/worktrees",
+      "reviewConfig": "$HOME/claude-workspace/.cache/peanut-review/.peanut-review.json",
+      "repositories": {
+        "example-public-org/widget": {
+          "path": "$HOME/claude-workspace/projects/widget",
+          "worktreeRoot": "$HOME/claude-workspace/projects/worktrees/widget"
+        }
+      }
+    },
+    {
+      "hostname": "github.com",
+      "login": "my-emu-login",
+      "label": "EMU",
+      "cloneRoot": "$HOME/claude-workspace/projects-emu",
+      "worktreeRoot": "$HOME/claude-workspace/projects-emu/worktrees",
+      "reviewConfig": "$HOME/claude-workspace/.cache/peanut-review/.peanut-review.json",
+      "repositories": {
+        "example-emu-org/component": {
+          "path": "$HOME/claude-workspace/projects-emu/example-emu-org/component",
+          "worktreeRoot": "$HOME/claude-workspace/projects-emu/worktrees/example-emu-org/component"
+        }
+      }
+    }
+  ]
+}
+```
+
+Paths may be absolute or relative to the queue config, and support `~` and
+environment variables. `repositories` provides optional per-repository
+settings; unmapped repositories use `<cloneRoot>/<owner>/<repo>` and
+`<worktreeRoot>/<owner>/<repo>`. Explicit mappings are needed for the flat
+public checkout layout. When setting `path`, also set `worktreeRoot` to the
+repository-specific directory: the queue does not append `owner/repo` to that
+root when `path` is explicit. `repositories` is a checkout mapping, not a PR
+discovery allowlist; account-wide review requests can include unmapped repos.
+These paths are included in the copied driver task. The driver handles
+clone/worktree setup and discovers any missing settings.
+
+`prepare` is an optional list of command argument arrays included as setup
+context in the copied task. The driver follows project build/test instructions
+and decides how to prepare the checkout. The queue never executes these commands.
+New reviews use the selected review config's agents; existing sessions retain
+their saved lineup, models, and runners.
+
+### Validate and start the queue
+
+Edit a candidate beside the saved config so relative paths keep the same
+meaning. Back up an existing config locally, preserve its entries, and validate
+the candidate before replacing it. Use owner-only permissions for the queue
+directory and config (`0700` and `0600`). Confirm the destination is ignored:
+
+```bash
+git -C "$META_WORKSPACE" check-ignore "$QUEUE_CONFIG"
+
+# Use the candidate filename here before installing it as config.json.
+PYTHONPATH="$PEANUT_REVIEW_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+  python3 - "$QUEUE_CONFIG" <<'PY'
+import sys
+from peanut_review.review_queue import load_config
+
+config = load_config(sys.argv[1])
+print(f"Queue config valid: {len(config['accounts'])} account(s)")
+PY
+```
+
+This checks schema and path expansion without contacting GitHub, starting a
+server, or launching reviewers. It does not prove account access or that paths
+exist. Check the resolved checkout paths and that each `reviewConfig` is readable
+and retains the intended reviewer/curator lineup. Use stable absolute paths or
+`$HOME` in the saved config; `$PWD` depends on where the server starts.
+
+After saving the validated config, start the dashboard:
+
+```bash
+PR_ROOT="$PR_ROOT" "$PEANUT_REVIEW_DIR/bin/peanut_review_serve.sh" \
+  --queue-config "$QUEUE_CONFIG"
+```
+
+The flag is optional for `$PR_ROOT/.queue/config.json`. Startup begins GitHub
+polling with each configured identity. Confirm the account status in `/queue`,
+then use **Copy review task** on an available PR to check its account, checkout,
+worktree root, session root, and reviewer config before handing it to a driver.
+An empty queue can simply mean no matching review requests. Authentication or
+team-membership errors require fixing that account's credentials/access, not
+switching the globally active account. Queue setup does not launch reviewers or
+publish reviews.
+
+Open `http://localhost:27183/queue`. The queue uses a loopback bind on the host.
+Inside Docker, the normal launcher's `0.0.0.0` bind is supported with the
+container port published on host loopback as described above. Restart the
+existing server from the updated checkout after changing its startup
+configuration; a server started in another container does not replace the
+instance reached by your forwarded port. Remote access can use an SSH
+localhost port forward. A stripped proxy prefix is still
+supported through `--base-url`. The browser polls local cached status every
+three seconds; GitHub is polled at `pollSeconds` (minimum 30). **Refresh queue**
+requests a remote poll and never starts reviewers. Search results are paginated;
+GitHub's incomplete-search response or 1,000-result cap is reported as an error
+rather than silently dropping requests.
+
+**Copy review task** and **Copy re-review task** copy a task for your driver
+conversation. It includes the PR URL, selected GitHub account, review config,
+session root, existing session/workspace, configured checkout paths, and observed
+revision. If clipboard access is unavailable, a dialog provides selectable text.
+The driver uses the peanut-review skill and CLI to fetch the latest revision,
+reuse the existing PR worktree and session, prepare the build, run reviewers and
+the curator, and produce a publication dry-run. It checks existing worktrees
+before creating one. Force pushes and divergent branches are reconciled in the
+same directory: the driver preserves the old branch tip and local edits before
+moving the review branch to the fetched PR head. Build artifacts and review
+history are retained, and saved work is identified in the handoff. Copying a
+task does not launch agents, change a checkout, or publish to GitHub.
+
+The queue automatically discovers CLI-created sessions under its session roots.
+Progress and the **Running reviews** filter reflect session agent activity;
+historical queue job failures do not override current driver progress.
+**Open review** opens the existing session. The old queue start endpoint is
+retired; reload any browser tab still showing execution buttons.
+
+Freshness compares the remote head, base commit and base branch with the last
+completed reviewer-and-curator round. Each CLI launch records its pinned
+snapshot and unique run IDs in the session's `review-completion.json`.
+Supervisors record completion only after fresh completion signals and successful
+exits (including supervised shutdown after completion). All configured reviewers
+and a subsequent curator covering those runs must complete against the same
+snapshot. This also works when the dashboard is stopped. A push during a review
+leaves the completed result stale; fetching or synchronizing alone cannot mark
+it reviewed. Stale polling or an API failure produces **Unknown**.
+
+Older recorded queue completions remain valid. Legacy sessions containing only
+completion signals cannot prove which revision was reviewed and remain
+**Not reviewed** (or **Stale** when their pinned revision differs) until a full
+round is recorded with the updated launcher. Synchronize legacy PR metadata
+before that round to capture the base branch name as well as its commit.
+
+Queue metadata is stored beneath `<primary-session-root>/.queue/` with restricted
+file permissions. Keep that root private when combining accounts. Only the
+configured account identities are exposed, and GitHub operations never switch
+the globally active `gh` account. Queue actions require a token supplied by the
+local page and reject cross-origin submissions.
