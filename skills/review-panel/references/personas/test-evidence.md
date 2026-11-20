@@ -31,6 +31,13 @@ Examine what the available evidence actually establishes:
   metadata/identity calculation and its consumer's validator, run one real
   producer-to-consumer path for that changed contract. Mocks for storage or
   transport can remain; preserve the validation whose compatibility is at issue.
+- Check fixture shape against the production branches it activates: legacy
+  records without explicit outputs or fingerprints cannot prove modern-history
+  compatibility. Follow all validators reached after the initially tested helper.
+- Challenge scale and retry boundaries: cap plus one, repeated cleanup, completed
+  outputs before build, mixed receipt states, and downstream-only recovery.
+  Exercise actual workflow conditions including dependency status and cancellation;
+  rerun registered suites when their evaluators or credential fixtures must change.
 
 Use test code, real callers, commands and outputs, and relevant baseline CI.
 Record unavailable evidence and the narrow check that would resolve it.

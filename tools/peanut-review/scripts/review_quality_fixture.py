@@ -234,12 +234,168 @@ def create_integration(output: Path):
     return {**primary, 'related_sources': [related]}
 
 
+LIFECYCLE_BASE = {
+    'dispatch.py': '''"""Real dispatches use stable workflow code; previews may use any ref.
+
+Reject unsupported real dispatches before loading code or accessing credentials,
+including when a stored request is restored.
+"""
+
+
+def run(ref, preview, restored, events):
+    if not preview and ref != "stable":
+        raise ValueError("real dispatch requires stable")
+    events.extend(["load-code", "install", "credentialed-lookup"])
+    if restored:
+        return "restored"
+    return "resolved"
+''',
+    'maintenance.py': '''"""Expire terminal payloads in bounded batches, leaving protected records intact.
+
+Large backlogs must make progress over repeated calls. Authority can change
+between discovery and deletion, so recheck each selected record before removal.
+"""
+
+
+def sweep(records, authorize, cap=4):
+    if cap < 1:
+        raise ValueError("cap must be positive")
+    targets = sorted(key for key, item in records.items()
+                     if item["terminal"] and not item["protected"])
+    targets = targets[:cap]
+    for key in targets:
+        if not authorize(key):
+            raise ValueError("authority changed")
+        del records[key]
+    return targets
+''',
+    'archive.py': '''"""Published identity survives plan evolution; active work uses today's plan.
+
+Legacy single-output records and explicit multi-output records remain readable.
+"""
+import hashlib
+
+CURRENT_PLAN = "v2"
+
+
+def fingerprint(outputs, algorithm):
+    return hashlib.sha256(repr((algorithm, outputs)).encode()).hexdigest()
+
+
+def make(outputs, algorithm=CURRENT_PLAN):
+    return {"id": 7, "outputs": list(outputs), "algorithm": algorithm,
+            "fingerprint": fingerprint(list(outputs), algorithm)}
+
+
+def validate_active(record):
+    if record["fingerprint"] != fingerprint(record["outputs"], CURRENT_PLAN):
+        raise ValueError("active plan changed")
+
+
+def validate_set(record):
+    if record["fingerprint"] != fingerprint(record["outputs"], record["algorithm"]):
+        raise ValueError("recorded output set changed")
+
+
+def read_published(record):
+    if type(record.get("id")) is not int or record["id"] < 1:
+        raise ValueError("invalid identity")
+    if "outputs" in record:
+        validate_set(record)
+    return record["id"]
+''',
+    'selection.py': '''"""A missing published set gets a useful error before choosing a representative."""
+
+
+def select(entries):
+    if not entries:
+        raise ValueError("expected a nonempty published set")
+    return next(iter(entries.values()))
+''',
+    'credentials.py': '''"""Support either historical key name; preserve distinct keys when both exist.
+
+Primary-only and legacy-only callers must work with either helper interface.
+"""
+
+
+def keys(primary="", legacy=""):
+    if not primary and not legacy:
+        raise ValueError("a source key is required")
+    return primary or legacy, legacy or primary
+''',
+    'pipeline.py': '''"""Each output has its own immutable completion receipt and write-once page.
+
+Verify receipts before expensive builds. Missing receipts allow builds; invalid
+or unreadable receipts allow neither builds nor pages and must fail the run.
+Publish verified outputs independently despite other failures. All-complete
+retries may recover pages without rebuilding; cancellation suppresses pages.
+"""
+
+
+def plan(receipts, verify):
+    pending, ready, errors = [], [], []
+    for output, receipt in receipts.items():
+        if receipt is None:
+            pending.append(output)
+            continue
+        try:
+            if not verify(output, receipt):
+                raise ValueError("receipt mismatch")
+            ready.append(output)
+        except (ValueError, OSError):
+            errors.append(output)
+    return pending, ready, errors
+
+
+def build_plan(receipts, verify):
+    return plan(receipts, verify)
+
+
+def publish_pages(receipts, verify, build_status, cancelled=False):
+    if cancelled:
+        return [], False
+    pending, ready, errors = plan(receipts, verify)
+    return ready, bool(errors) or build_status == "failure"
+''',
+}
+
+
+def lifecycle_candidate_sources():
+    files = dict(LIFECYCLE_BASE)
+    files['dispatch.py'] = files['dispatch.py'].replace(
+        '    events.extend(["load-code", "install", "credentialed-lookup"])\n', '').replace(
+        '    if not preview and ref != "stable":\n',
+        '    events.extend(["load-code", "install", "credentialed-lookup"])\n'
+        '    if restored:\n        return "restored"\n'
+        '    if not preview and ref != "stable":\n')
+    files['maintenance.py'] = files['maintenance.py'].replace(
+        '    targets = targets[:cap]\n',
+        '    if len(targets) > cap:\n        raise ValueError("cap exceeded")\n')
+    files['archive.py'] = files['archive.py'].replace(
+        '        validate_set(record)\n', '        validate_active(record)\n        validate_set(record)\n')
+    files['selection.py'] = files['selection.py'].replace(
+        '    if not entries:\n', '    representative = next(iter(entries.values()))\n    if not entries:\n'
+    ).replace('    return next(iter(entries.values()))\n', '    return representative\n')
+    files['credentials.py'] = files['credentials.py'].replace(
+        '    if not primary and not legacy:\n', '    if not primary:\n'
+    ).replace('    return primary or legacy, legacy or primary\n', '    return primary, primary\n')
+    files['pipeline.py'] = files['pipeline.py'].replace(
+        '    return plan(receipts, verify)\n', '    return list(receipts), [], []\n'
+    ).replace('    if cancelled:\n', '    if cancelled or build_status != "success":\n')
+    return files
+
+
+def create_lifecycle(output: Path):
+    return _create(output, LIFECYCLE_BASE, lifecycle_candidate_sources())
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True, help='New repository directory')
-    parser.add_argument('--scenario', choices=('history', 'integration'), default='history')
+    parser.add_argument('--scenario', choices=('history', 'integration', 'lifecycle'), default='history')
     args = parser.parse_args()
-    create_fixture = create_integration if args.scenario == 'integration' else create
+    create_fixture = {'history': create, 'integration': create_integration,
+                      'lifecycle': create_lifecycle}[args.scenario]
     print(json.dumps(create_fixture(args.output), indent=2))
 
 

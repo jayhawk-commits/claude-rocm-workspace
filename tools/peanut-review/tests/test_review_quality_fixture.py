@@ -138,3 +138,130 @@ def test_integration_generator_has_distinct_clean_pinned_inputs(tmp_path):
         assert not subprocess.check_output(['git', '-C', source, 'status', '--porcelain'], text=True).strip()
     jobs = module(fixture.integration_candidate_sources(), 'jobs.py')
     assert jobs['run_jobs']([], lambda _: pytest.fail('empty work dispatched')) == []
+
+
+@pytest.mark.parametrize('restored', [False, True])
+def test_dispatch_guard_protects_fresh_and_restored_paths(restored):
+    for files, broken in ((fixture.LIFECYCLE_BASE, False), (fixture.lifecycle_candidate_sources(), True)):
+        dispatch = module(files, 'dispatch.py')['run']
+        events = []
+        if broken and restored:
+            assert dispatch('topic', False, restored, events) == 'restored'
+        else:
+            with pytest.raises(ValueError, match='stable'):
+                dispatch('topic', False, restored, events)
+        assert bool(events) == broken
+        assert dispatch('topic', True, restored, []) in {'resolved', 'restored'}
+        assert dispatch('stable', False, restored, []) in {'resolved', 'restored'}
+
+
+def test_cleanup_cap_allows_progress_above_limit_with_authority_controls():
+    for files, broken in ((fixture.LIFECYCLE_BASE, False), (fixture.lifecycle_candidate_sources(), True)):
+        sweep = module(files, 'maintenance.py')['sweep']
+        records = {str(i): {'terminal': True, 'protected': False} for i in range(5)}
+        records['active'] = {'terminal': False, 'protected': False}
+        records['completed'] = {'terminal': True, 'protected': True}
+        if broken:
+            with pytest.raises(ValueError, match='cap exceeded'):
+                sweep(records, lambda _: True)
+            assert len(records) == 7
+        else:
+            assert len(sweep(records, lambda _: True)) == 4
+            assert len(sweep(records, lambda _: True)) == 1
+            assert sweep(records, lambda _: True) == []
+            assert set(records) == {'active', 'completed'}
+        # At the cap, both versions still protect against a changed authority.
+        small = {'one': {'terminal': True, 'protected': False}}
+        with pytest.raises(ValueError, match='authority changed'):
+            sweep(small, lambda _: False)
+        assert 'one' in small
+
+
+def test_explicit_historical_outputs_activate_validation_legacy_fixture_misses():
+    for files, broken in ((fixture.LIFECYCLE_BASE, False), (fixture.lifecycle_candidate_sources(), True)):
+        archive = module(files, 'archive.py')
+        old = archive['make'](['north', 'south'], algorithm='v1')
+        if broken:
+            with pytest.raises(ValueError, match='active plan changed'):
+                archive['read_published'](old)
+        else:
+            assert archive['read_published'](old) == 7
+        with pytest.raises(ValueError, match='active plan changed'):
+            archive['validate_active'](old)
+        assert archive['read_published']({'id': 7}) == 7
+        current = archive['make'](['north', 'south'])
+        assert archive['read_published'](current) == 7
+        archive['validate_active'](current)
+        current['outputs'].pop()
+        with pytest.raises(ValueError):
+            archive['read_published'](current)
+
+
+def test_empty_publication_reports_contract_error_before_selecting_entry():
+    base = module(fixture.LIFECYCLE_BASE, 'selection.py')['select']
+    candidate = module(fixture.lifecycle_candidate_sources(), 'selection.py')['select']
+    with pytest.raises(ValueError, match='nonempty published set'):
+        base({})
+    with pytest.raises(StopIteration):
+        candidate({})
+    assert base({'north': 'record'}) == candidate({'north': 'record'}) == 'record'
+
+
+def test_credential_contract_keeps_distinct_values_and_single_key_callers():
+    base = module(fixture.LIFECYCLE_BASE, 'credentials.py')['keys']
+    candidate = module(fixture.lifecycle_candidate_sources(), 'credentials.py')['keys']
+    assert base('primary-test', 'legacy-test') == ('primary-test', 'legacy-test')
+    assert candidate('primary-test', 'legacy-test') == ('primary-test', 'primary-test')
+    assert base('', 'legacy-test') == ('legacy-test', 'legacy-test')
+    with pytest.raises(ValueError):
+        candidate('', 'legacy-test')
+    for keys in (base, candidate):
+        assert keys('primary-test') == ('primary-test', 'primary-test')
+        with pytest.raises(ValueError):
+            keys()
+
+
+def verify_receipt(output, receipt):
+    if receipt == 'unreadable':
+        raise OSError('read failed')
+    return receipt == output
+
+
+def test_completion_precedes_expensive_build_and_all_complete_is_valid():
+    for files, broken in ((fixture.LIFECYCLE_BASE, False), (fixture.lifecycle_candidate_sources(), True)):
+        pipeline = module(files, 'pipeline.py')
+        receipts = {'north': 'north', 'south': None, 'west': 'wrong', 'east': 'unreadable'}
+        pending, ready, errors = pipeline['build_plan'](receipts, verify_receipt)
+        if broken:
+            assert pending == list(receipts)
+        else:
+            assert (pending, ready, errors) == (['south'], ['north'], ['west', 'east'])
+        pending, ready, errors = pipeline['build_plan']({'north': 'north'}, verify_receipt)
+        assert bool(pending) == broken
+
+
+@pytest.mark.parametrize('build_status', ['failure', 'skipped'])
+def test_independent_pages_recover_after_partial_failure_or_no_builds(build_status):
+    receipts = {'north': 'north', 'south': None, 'west': 'wrong', 'east': 'unreadable'}
+    for files, broken in ((fixture.LIFECYCLE_BASE, False), (fixture.lifecycle_candidate_sources(), True)):
+        publish = module(files, 'pipeline.py')['publish_pages']
+        pages, failed = publish(receipts, verify_receipt, build_status)
+        assert pages == ([] if broken else ['north'])
+        if not broken:
+            assert failed
+            assert publish({'north': 'north'}, verify_receipt, 'skipped') == (['north'], False)
+        assert publish(receipts, verify_receipt, build_status, cancelled=True) == ([], False)
+        assert publish({'north': 'north'}, verify_receipt, 'success') == (['north'], False)
+
+
+def test_lifecycle_cli_generates_clean_review_inputs_without_answer_key(tmp_path):
+    import json
+    import sys
+    result = subprocess.run([sys.executable, str(Path(fixture.__file__)), '--scenario', 'lifecycle',
+                             '--output', str(tmp_path / 'source')], capture_output=True, text=True, check=True)
+    manifest = json.loads(result.stdout)
+    source = Path(manifest['source'])
+    assert sorted(p.name for p in source.iterdir() if p.name != '.git') == sorted(fixture.LIFECYCLE_BASE)
+    assert subprocess.check_output(['git', '-C', str(source), 'status', '--porcelain'], text=True) == ''
+    for name in fixture.LIFECYCLE_BASE:
+        assert (source / name).read_text() == fixture.lifecycle_candidate_sources()[name]

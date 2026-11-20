@@ -195,6 +195,15 @@ copies the selected personas and routes both reviewers and curator to the
 applicable [regression probes](../../skills/review-panel/references/regression-probes.md).
 This changes review instructions; it does not train model weights.
 
+The fictional `lifecycle` replay adds guard placement on restored requests,
+bounded cleanup progress, historical aggregate validation, empty selection,
+credential compatibility, early completion checks and independent output pages.
+Its policy explicitly permits independent publication; it is not a universal
+requirement. Generate it with `scripts/review_quality_fixture.py --scenario lifecycle
+--output <new-directory>`, then initialize a normal bounded review from the printed
+base and source. Keep the test oracle outside the review inputs. Passing unit
+probes and delivering prompts are separate from a model finding the seeded defects.
+
 For a small fictional replay, create a fresh repository outside the harness:
 
 ```sh

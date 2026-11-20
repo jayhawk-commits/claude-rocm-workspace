@@ -22,6 +22,14 @@ Follow a representative value from creation to use:
   cleanup and active resume after a schema or fingerprint change. Historical
   identity checks and active payload validation can require different contracts;
   a newly written record alone cannot establish upgrade compatibility.
+- Trace historical reads through aggregate output-set validators too. Exercise
+  explicit package definitions and per-output plan fingerprints as well as legacy
+  shapes; permissive legacy fixtures can skip the validator that rejects history.
+- Check completion receipts before expensive rebuilds, then check downstream
+  recovery on an all-complete retry. Distinguish absent, invalid and unreadable
+  receipts, and use the documented per-output or atomic publication policy.
+- For bounded cleanup, exercise more eligible objects than the cap and a second
+  sweep. Verify progress, permanent history and authority checks before deletion.
 - For resumable exact-inventory uploads, retry with a smaller or renamed file
   set. Check obsolete files, destination confinement, sibling preservation and
   completed checkpoints. For user-selected payload paths, check collisions with

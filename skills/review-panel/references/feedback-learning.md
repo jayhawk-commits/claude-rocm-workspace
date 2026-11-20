@@ -6,6 +6,9 @@ Use when the user asks to improve review quality from later human or CI findings
    session and outcome, later feedback, affected revision and disposition. An
    incomplete session, a changed head or a post-feedback review is not evidence
    that the original harness missed that issue.
+   Preserve review scope too: approval of a small follow-up is not a full review
+   of unchanged code. A newly chosen publication policy is a decision, not proof
+   that the previous reviewer missed a defect.
 2. Validate each claim against code and callers. Separate defects, evidence gaps,
    optional improvements and design decisions. Record why a confirmed defect
    escaped: missing scenario, weak oracle, missed consumer, curation loss or an
@@ -15,6 +18,9 @@ Use when the user asks to improve review quality from later human or CI findings
    source in the private ledger; use independently written fictional examples
    for shared fixtures. Preserve existing guidance and avoid turning suggestions
    into universal blockers.
+   Make the fixture activate the missed production branch, such as explicit
+   outputs and aggregate validation, rather than relying only on permissive
+   legacy records. Include cap-plus-one and repeated progress when scale matters.
 4. Verify the official harness actually supplies the changed guidance to both
    reviewers and curator. Keep prompt-delivery tests separate from quality
    evidence. Replay a small faulty and compatible case without giving the

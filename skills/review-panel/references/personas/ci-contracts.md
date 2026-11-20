@@ -36,6 +36,15 @@ Investigate the changed path end to end:
   completion; moving work after publication can still hold its caller's lock.
 - Trace validation to the first durable mutation. A later build validation does
   not prevent invalid input from consuming a reservation in an earlier job.
+- For dispatch restrictions, inspect work before the guard as well as mutations:
+  checkout, dependency installation and credentialed reads may precede it. Test
+  restored requests that bypass fresh resolution and preserve allowed dry-runs.
+- For independent output publication, follow implicit dependency-success gates.
+  Exercise failed and skipped matrix legs, all-complete retries, invalid receipts
+  and cancellation; keep failures visible while allowing verified outputs through.
+  Establish the intended atomicity before recommending a policy change.
+- Across credential renames, test distinct values, each name alone and neither
+  against the supported helper revisions and reusable secret declarations.
 
 Use actual callers and consumers, the repository's workflow conventions, and
 relevant PR/baseline CI as evidence. Compare equivalent configurations; a

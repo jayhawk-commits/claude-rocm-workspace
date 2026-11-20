@@ -201,18 +201,25 @@ def test_init_pins_personas_and_does_not_modify_source_refs(source, tmp_path):
     assert 'Workspace review contract' in (directory / 'templates/agent-prompt.md').read_text()
 
 
-def test_regression_guidance_reaches_reviewers_and_curator(source, tmp_path):
-    directory = profile.initialize(init_args(source, tmp_path / 'review'))
+@pytest.mark.parametrize('roles', [('release-contracts', 'test-evidence'), ('ci-contracts', 'test-evidence')])
+def test_regression_guidance_reaches_reviewers_and_curator(source, tmp_path, roles):
+    args = init_args(source, tmp_path / 'review')
+    args.persona = list(roles)
+    directory = profile.initialize(args)
     # These templates are the ones run_review passes to the actual launch APIs.
     # Check delivery to both roles, independently of persona wording or model output.
     guide = profile.WORKSPACE_ROOT / 'skills/review-panel/references/regression-probes.md'
     assert guide.is_file()
+    for boundary in ('Guard placement and restored requests', 'Bounded maintenance',
+                     'Credential interface compatibility', 'Per-output completion and downstream jobs'):
+        assert boundary in guide.read_text()
     for name in ('agent-prompt.md', 'curator-prompt.md'):
         template = (directory / 'templates' / name).read_text()
         assert str(guide) in template
         assert 'Apply only reachable scenarios' in template
     for agent in session.load_session(directory).agents[:2]:
-        assert (directory / 'personas' / agent.persona).is_file()
+        copied = directory / 'personas' / agent.persona
+        assert copied.read_text() == (profile.PERSONAS / agent.persona).read_text()
 
 
 def test_init_rejects_dirty_source_and_overlapping_session(source):
