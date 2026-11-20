@@ -12,6 +12,10 @@ repeatable curation, use the installed
 [Peanut Review harness](../../tools/peanut-review/LOCAL_SETUP.md). Both routes
 use the persona references below. Preserve the authorized model/provider.
 
+When improving the workflow from later human or CI feedback, follow
+[feedback learning](references/feedback-learning.md). Keep case provenance local
+and distinguish prompt changes, regression replay and measured review quality.
+
 Resolve this skill's symlink/junction to its canonical directory first. The
 meta-workspace is two parents above that directory. Read its
 `reviews/README.md`, `reviews/REVIEW_GUIDELINES.md`, and `AI_EFFICIENCY.md`, plus
@@ -23,6 +27,12 @@ workspace review defaults take precedence over older templates.
 - Identify the target repository, review-only or authorized implementation
   mode, intended base, and current head. Never assume `main` or treat an
   upstream tracking branch as the PR base without checking.
+- For changes with advertised dependencies or overlapping pending producer,
+  consumer or workflow changes, discover those related revisions before launch.
+  Supply available clean snapshots with the official initializer's repeatable
+  `--related-source` option. Keep a neutral input inventory separate from human
+  conclusions. If a material related revision is unavailable, report the gap;
+  do not infer integrated readiness from standalone reviews.
 - Read [run records](references/run-records.md) for snapshot commands, artifact
   fields and completion rules. Freeze the merge-base and head before dispatch.
   Dirty changes need a separately captured patch or a clearly labeled focused
@@ -64,6 +74,10 @@ Read only the selected references:
    duplicates, and record reasons for rejected or unresolved findings. Reviewer
    agreement alone is not evidence. Preserve material disagreements and
    distinguish introduced defects, existing behavior and follow-up work.
+   On a re-review, separate closure of known findings from remaining coverage:
+   unchanged code can retain untested assumptions or gain new consumers from a
+   base refresh. For optional backends or migrations, state evidence by mode
+   and transition; a successful default-mode run does not certify activation.
 4. Verify the snapshot again and, for a PR, re-fetch its head/base metadata
    before preparing current inline anchors. If it changed, mark results stale;
    re-review the affected scope within the remaining bounds or report that
@@ -107,6 +121,11 @@ finish against the recorded source state. Skipped, failed, stale or incomplete
 reviews are not approval evidence. If a separate curator is used, wait for its
 completion too. Prefer deterministic tests or authoritative source evidence to
 another model vote.
+
+The official profile records a coverage-based recommendation separately from
+successful process completion. Read that recommendation and its gaps before
+reporting approval; a missing or materially unverified record is a wait for
+evidence even when all agents exited successfully.
 
 ## Private references
 

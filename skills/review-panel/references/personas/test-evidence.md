@@ -13,10 +13,24 @@ Examine what the available evidence actually establishes:
 - Is the expected result independent of the changed logic? Shared helpers,
   generated expectations and excessive mocks can hide the same defect on both
   sides of a comparison.
+- For workflow guards, challenge the actual expression or shell branch with a
+  plausible inversion, such as `&&` becoming `||` or an empty check reversing.
+  Finding the expected substring in a condition does not prove it gates work.
+  For required membership, use a contract-owned expected set rather than deriving
+  it from the selector being tested.
 - Was the intended backend, target, revision and configuration exercised?
   Check skips, filtering, fixtures and cached artifacts before trusting a pass.
+- For migrations, distinguish steady-state happy paths from copy/backfill,
+  partial publication and an existing persisted store. Check intermediate work
+  and calls before an entry is skipped, and use an unexpected-but-valid object
+  shape to challenge publication or identity assumptions. A green final result
+  does not establish bounded work or correct historical ordering.
 - Does the failure occur on the base as well as the head? Separate introduced
   regressions from existing bugs, environmental failures and source-data issues.
+- Identify which boundary each test replaces. If tests mock both a producer's
+  metadata/identity calculation and its consumer's validator, run one real
+  producer-to-consumer path for that changed contract. Mocks for storage or
+  transport can remain; preserve the validation whose compatibility is at issue.
 
 Use test code, real callers, commands and outputs, and relevant baseline CI.
 Record unavailable evidence and the narrow check that would resolve it.

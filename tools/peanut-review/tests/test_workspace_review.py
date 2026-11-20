@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from peanut_review import session
+from peanut_review.models import Comment
 
 spec = importlib.util.spec_from_file_location(
     'workspace_review', Path(__file__).resolve().parents[1] / 'scripts/workspace_review.py')
@@ -36,6 +37,154 @@ def init_args(source, directory):
         '--session', str(directory), '--model', 'test-model', '--effort', 'high'])
 
 
+@pytest.fixture
+def related_source(source, tmp_path):
+    path = tmp_path / 'related source'
+    profile.git(source, 'clone', '--no-hardlinks', str(source), str(path))
+    profile.git(path, 'config', 'user.name', 'Fixture')
+    profile.git(path, 'config', 'user.email', 'fixture@example.invalid')
+    return path
+
+
+def related_args(source, related, directory):
+    return profile.parser().parse_args(['init', '--source', str(source), '--base', 'trunk',
+        '--session', str(directory), '--model', 'test-model', '--effort', 'high',
+        '--related-source', str(related)])
+
+
+def test_related_inputs_are_pinned_and_delivered_without_source_mutation(source, related_source, tmp_path):
+    before = {root: profile.git(root, 'show-ref') for root in (source, related_source)}
+    args = related_args(source, related_source, tmp_path / 'review')
+    directory = profile.initialize(args)
+    manifest = profile.local_policy.policy_directory(directory) / 'workspace-snapshot.json'
+    snapshot = json.loads(manifest.read_text())
+    assert snapshot['relatedSources'] == [{
+        'path': str(related_source.resolve()), 'head': profile.git(related_source, 'rev-parse', 'HEAD'),
+        'clean': True}]
+    for name in ('agent-prompt.md', 'curator-prompt.md'):
+        template = (directory / 'templates' / name).read_text()
+        assert str(manifest) in template
+        assert 'Combined compatibility' in template or 'combined compatibility' in template
+        assert 'local, read-only inputs' in template
+    for root in (source, related_source):
+        assert profile.git(root, 'show-ref') == before[root]
+        assert profile.git(root, 'status', '--porcelain') == ''
+    profile.snapshot_current(directory)
+
+
+@pytest.mark.parametrize('kind', ['primary', 'duplicate', 'nested', 'session-overlap', 'limit', 'dirty'])
+def test_related_inputs_reject_invalid_scope_before_creating_session(source, related_source, tmp_path, kind):
+    args = related_args(source, related_source, tmp_path / 'review')
+    if kind == 'primary':
+        args.related_source = [str(source)]
+    elif kind == 'duplicate':
+        args.related_source *= 2
+    elif kind == 'nested':
+        args.related_source = [str(source / '.git')]
+    elif kind == 'session-overlap':
+        args.session = str(related_source / 'review')
+    elif kind == 'limit':
+        args.related_source *= profile.MAX_RELATED_SOURCES + 1
+    else:
+        (related_source / 'untracked').write_text('preserve this work')
+    with pytest.raises(ValueError):
+        profile.initialize(args)
+    assert not Path(args.session).exists()
+    if kind == 'dirty':
+        assert (related_source / 'untracked').read_text() == 'preserve this work'
+
+
+@pytest.mark.parametrize('mutation', ['dirty', 'head'])
+def test_related_source_movement_invalidates_snapshot(source, related_source, tmp_path, mutation):
+    directory = profile.initialize(related_args(source, related_source, tmp_path / 'review'))
+    (related_source / 'code.py').write_text('value = 3\n')
+    if mutation == 'head':
+        profile.git(related_source, 'commit', '-am', 'new related revision')
+    with pytest.raises(ValueError, match='related source'):
+        profile.snapshot_current(directory)
+
+
+def test_related_source_change_prevents_successful_final_export(source, related_source, tmp_path, monkeypatch):
+    directory = profile.initialize(related_args(source, related_source, tmp_path / 'review'))
+    monkeypatch.setattr(profile, 'pending_agents', lambda _, agents, **__: [a.name for a in agents])
+    monkeypatch.setattr(profile.launch, 'rerun_agents', lambda *_, **__: None)
+    monkeypatch.setattr(profile.launch, 'launch_curator', lambda *_, **__: None)
+    monkeypatch.setattr(profile, 'deadline_for', lambda _: 1000)
+    monkeypatch.setattr(profile.agent_control, 'kill_agents', lambda _: None)
+
+    def wait(_, names, deadline):
+        if names == ['Curator']:
+            (related_source / 'code.py').write_text('value = 3\n')
+            profile.git(related_source, 'commit', '-am', 'moved during review')
+
+    monkeypatch.setattr(profile, 'wait_completed', wait)
+    with pytest.raises(ValueError, match='related source HEAD changed'):
+        profile.run_review(SimpleNamespace(session=str(directory), retry_failed=False, dry_run=False))
+    assert json.loads((directory / 'workspace-result.json').read_text())['status'] == 'incomplete'
+    assert not (directory / 'result.md').exists()
+
+
+def test_legacy_snapshot_without_related_inputs_still_validates(source, tmp_path):
+    directory = profile.initialize(init_args(source, tmp_path / 'review'))
+    manifest = profile.local_policy.policy_directory(directory) / 'workspace-snapshot.json'
+    snapshot = json.loads(manifest.read_text())
+    del snapshot['relatedSources']
+    profile.write_json(manifest, snapshot)
+    profile.snapshot_current(directory)
+
+
+def write_covered_approval(directory):
+    current = session.load_session(directory)
+    for agent in current.agents:
+        profile.write_json(directory / 'coverage' / f'{agent.name}.json', {
+            'head': current.current_head, 'base': current.base_ref, 'verdict': 'approve',
+            'areas': [{'id': name, 'status': 'not_applicable', 'material': False,
+                       'evidence': 'Fixture changes only a constant; this contract is not reached.'}
+                      for name in profile.review_coverage.AREAS]})
+
+
+def test_missing_coverage_suppresses_approval_but_preserves_finding_and_raw_store(source, tmp_path):
+    directory = profile.initialize(init_args(source, tmp_path / 'review'))
+    profile.store.append_comment(directory, Comment(author='Curator', body='LGTM'))
+    profile.store.append_comment(directory, Comment(author='Curator', category='approve',
+                                                   body='Approved within the inspected scope.'))
+    profile.store.append_comment(directory, Comment(author='release-contracts', file='code.py', line=1,
+                                                   body='This caller still needs a compatible input.'))
+    report = profile.export_result(directory).read_text()
+    assert 'wait_for_evidence' in report
+    assert 'missing or invalid coverage record' in report
+    assert 'LGTM' not in report
+    assert 'Approved within' not in report
+    assert 'This caller still needs' in report
+    assert len(profile.store.read_all_comments(directory)) == 3
+
+
+def test_complete_coverage_allows_approval_export(source, tmp_path):
+    directory = profile.initialize(init_args(source, tmp_path / 'review'))
+    write_covered_approval(directory)
+    profile.store.append_comment(directory, Comment(author='Curator', body='LGTM'))
+    report = profile.export_result(directory).read_text()
+    assert 'Recommendation: **approve**' in report
+    assert 'LGTM' in report
+
+
+@pytest.mark.parametrize('covered', [False, True])
+def test_successful_process_flow_records_coverage_recommendation(source, tmp_path, monkeypatch, covered):
+    directory = profile.initialize(init_args(source, tmp_path / 'review'))
+    if covered:
+        write_covered_approval(directory)
+    monkeypatch.setattr(profile, 'pending_agents', lambda _, agents, **__: [a.name for a in agents])
+    monkeypatch.setattr(profile.launch, 'rerun_agents', lambda *_, **__: None)
+    monkeypatch.setattr(profile.launch, 'launch_curator', lambda *_, **__: None)
+    monkeypatch.setattr(profile, 'deadline_for', lambda _: 1000)
+    monkeypatch.setattr(profile, 'wait_completed', lambda *_: None)
+    profile.run_review(SimpleNamespace(session=str(directory), retry_failed=False, dry_run=False))
+    result = json.loads((directory / 'workspace-result.json').read_text())
+    assert result['status'] == 'complete'
+    assert result['recommendation'] == ('approve' if covered else 'wait_for_evidence')
+    assert bool(result['materialGaps']) is not covered
+
+
 def test_init_pins_personas_and_does_not_modify_source_refs(source, tmp_path):
     before = profile.git(source, 'show-ref')
     directory = profile.initialize(init_args(source, tmp_path / 'review'))
@@ -50,6 +199,20 @@ def test_init_pins_personas_and_does_not_modify_source_refs(source, tmp_path):
     assert snapshot['mergeBase'] == profile.git(source, 'rev-parse', 'trunk')
     assert profile.local_policy.enabled(directory)
     assert 'Workspace review contract' in (directory / 'templates/agent-prompt.md').read_text()
+
+
+def test_regression_guidance_reaches_reviewers_and_curator(source, tmp_path):
+    directory = profile.initialize(init_args(source, tmp_path / 'review'))
+    # These templates are the ones run_review passes to the actual launch APIs.
+    # Check delivery to both roles, independently of persona wording or model output.
+    guide = profile.WORKSPACE_ROOT / 'skills/review-panel/references/regression-probes.md'
+    assert guide.is_file()
+    for name in ('agent-prompt.md', 'curator-prompt.md'):
+        template = (directory / 'templates' / name).read_text()
+        assert str(guide) in template
+        assert 'Apply only reachable scenarios' in template
+    for agent in session.load_session(directory).agents[:2]:
+        assert (directory / 'personas' / agent.persona).is_file()
 
 
 def test_init_rejects_dirty_source_and_overlapping_session(source):
@@ -91,6 +254,17 @@ def test_status_labels_stale_results_even_when_all_workers_completed(source, tmp
     result = json.loads(capsys.readouterr().out)
     assert result['status'] == 'stale'
     assert all(row['complete'] for row in result['agents'])
+
+
+def test_status_completion_does_not_claim_approval_without_coverage(source, tmp_path, monkeypatch, capsys):
+    directory = profile.initialize(init_args(source, tmp_path / 'review'))
+    monkeypatch.setattr(profile.runtime, 'inspect_agent_runtime', lambda *_: dict(
+        signal=True, process_state='exited', exit_code=0, reviewer_live=False, supervisor_live=False))
+    profile.status(directory)
+    result = json.loads(capsys.readouterr().out)
+    assert result['status'] == 'complete'
+    assert result['recommendation'] == 'wait_for_evidence'
+    assert len(result['materialGaps']) == 3
 
 
 @pytest.mark.parametrize('changes', [

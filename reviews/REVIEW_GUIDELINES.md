@@ -45,6 +45,22 @@ Before retaining a finding:
 4. Explain the consequence and smallest useful correction. Separate optional
    redesign, unrelated cleanup and follow-up work.
 
+### Re-reviews and changed operating modes
+
+Distinguish closing known findings from reviewing the remaining change. An
+unchanged file can still contain an untested assumption, and a refreshed base
+can introduce new consumers of its fields. Record what prior evidence remains
+applicable, what new interaction was checked, and what is still unverified;
+closing the last tracked comment alone is not a whole-PR approval argument.
+
+For a migration or feature flag, state readiness by operating mode: behavior
+shipped under the default, optional-mode correctness, and environment-dependent
+activation prerequisites. A disabled mode's concrete defect is not necessarily
+a default-mode blocker, but it is not covered by default-mode CI either.
+Separate documentation corrections from activation evidence. Use the focused
+[backend migration guidance](guidelines/backend-migrations.md) when storage,
+persistence or backend selection changes.
+
 ### Key Principle: Cleanup Scope
 
 Trace affected callers when removing a feature or changing an interface. A
@@ -151,6 +167,7 @@ if an older checklist uses blanket blocking language.
 | Tests | [guidelines/tests.md](guidelines/tests.md) |
 | Documentation | [guidelines/documentation.md](guidelines/documentation.md) |
 | Artifacts | [guidelines/pr_patterns.md](guidelines/pr_patterns.md#pattern-adds-or-modifies-artifacts) |
+| Storage or persistence backend changes | [guidelines/backend-migrations.md](guidelines/backend-migrations.md) |
 | GitHub Actions | [guidelines/github_actions.md](guidelines/github_actions.md) |
 | PR hygiene | [guidelines/pr_hygiene.md](guidelines/pr_hygiene.md) |
 | Common PR patterns | [guidelines/pr_patterns.md](guidelines/pr_patterns.md) |

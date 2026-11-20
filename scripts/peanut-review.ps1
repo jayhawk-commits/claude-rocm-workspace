@@ -49,7 +49,7 @@ $gitDefaultsTemporary = $gitDefaultsPath + '.' + [guid]::NewGuid().ToString('N')
 [IO.File]::WriteAllText($gitDefaultsTemporary, ($gitDefaults -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
 Move-Item -LiteralPath $gitDefaultsTemporary -Destination $gitDefaultsPath -Force
 $forwarded = [Collections.Generic.List[string]]::new()
-$pathOptions = @('--source', '--session', '--session-root')
+$pathOptions = @('--source', '--related-source', '--session', '--session-root')
 for ($index = 0; $index -lt $ReviewArguments.Count; $index++) {
     $argument = $ReviewArguments[$index]
     if ($argument -in $pathOptions) {
@@ -57,7 +57,7 @@ for ($index = 0; $index -lt $ReviewArguments.Count; $index++) {
         $forwarded.Add($argument)
         $index++
         $forwarded.Add((ConvertTo-WslPath $ReviewArguments[$index]))
-    } elseif ($argument -match '^(--source|--session|--session-root)=(.*)$') {
+    } elseif ($argument -match '^(--source|--related-source|--session|--session-root)=(.*)$') {
         $forwarded.Add($Matches[1] + '=' + (ConvertTo-WslPath $Matches[2]))
     } else {
         $forwarded.Add($argument)

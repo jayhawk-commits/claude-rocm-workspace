@@ -113,6 +113,44 @@ by its existing deadline. A process killed during shutdown is still incomplete.
 
 ## Boundaries and iteration
 
+### Related changes and coverage
+
+For a review that depends on another pending producer, consumer or workflow
+change, pass each available clean checkout at initialization:
+
+```powershell
+.\scripts\peanut-review.ps1 init --source C:\Dev\consumer --base main `
+  --related-source C:\Dev\producer --model '<authorized-model>' --effort '<authorized-effort>'
+```
+
+Up to four related sources are pinned by canonical path and HEAD in the
+protected session snapshot. Both reviewers and curator receive a neutral input
+manifest. Dirty or changed related sources invalidate the review, just like a
+changed primary source. No source is fetched or modified by this option. Supply
+only relevant authorized inputs; private tracker content is not review context.
+
+New sessions require `coverage/<agent>.json` from both reviewers and curator,
+covering producer/consumer contracts, alternate entrypoints, validation before
+effects, moved workflow behavior, shared callers and declared integrations.
+The generated prompt supplies the schema. Applicable areas need concrete
+evidence; inapplicable areas need a reason. Missing/stale records, materially
+unverified contracts or unchecked declared integrations withhold approval.
+`complete` still means that processes and curation finished; the separately
+exported `recommendation` may be `wait_for_evidence` or `request_changes`.
+Coverage is reviewer-attested and cannot guarantee correctness. Existing
+sessions retain their original provenance and are not retroactively regraded.
+
+The integration replay can be generated with:
+
+```sh
+python scripts/review_quality_fixture.py --scenario integration --output /path/to/new-inputs
+```
+
+Pass its primary source/base and its `related_sources` checkout to normal init.
+This case checks interacting metadata changes, validation before allocation,
+and policy lost while extracting a helper, alongside a compatible empty-work
+control. Keep the expected outcomes outside the source shown to reviewers.
+
 - Default per-agent timeout: 15 minutes; overall deadline: 30 minutes from
   the first launch. `init --timeout` and `--max-seconds` can tighten these.
 - The persisted policy permits at most three concurrent worker processes,
@@ -147,6 +185,29 @@ content. A synthetic lifecycle test demonstrates orchestration behavior;
 it does not establish model review quality or measured cost savings.
 
 ## Verification
+
+### Learning from later feedback
+
+Use the review panel's [feedback-learning workflow](../../skills/review-panel/references/feedback-learning.md)
+to distinguish a missed scenario from an incomplete run, changed source, or a
+known-answer closure check. Keep case evidence local. Session initialization
+copies the selected personas and routes both reviewers and curator to the
+applicable [regression probes](../../skills/review-panel/references/regression-probes.md).
+This changes review instructions; it does not train model weights.
+
+For a small fictional replay, create a fresh repository outside the harness:
+
+```sh
+python scripts/review_quality_fixture.py --output /path/to/new-replay-source
+```
+
+The command prints the source, base and candidate SHAs. Pass that source and
+base to the normal PowerShell `init` and `run` commands above. Keep the expected
+outcomes outside the review source: the fixture's behavioral tests establish two
+defects and a compatible empty-selection control. Compare retained comments with
+those outcomes only after reviewers and curator finish. Record missed defects
+and false positives; a passing replay qualifies these examples, not overall
+review quality. The generator never invokes a model or a remote service.
 
 From the tool directory in the isolated WSL runtime:
 

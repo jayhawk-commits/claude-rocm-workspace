@@ -20,11 +20,12 @@ from datetime import datetime, timezone
 TOOL_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = TOOL_ROOT.parents[1]
 sys.path.insert(0, str(TOOL_ROOT))
-from peanut_review import agent_control, curator, launch, local_policy, runtime, session, store
+from peanut_review import agent_control, curator, launch, local_policy, review_coverage, runtime, session, store
 
 PERSONAS = WORKSPACE_ROOT / 'skills/review-panel/references/personas'
 SESSION_ROOT = WORKSPACE_ROOT.parent / '.cache/peanut-review/sessions'
 RUNNING = {runtime.PROCESS_RUNNING, runtime.PROCESS_LAUNCHING}
+MAX_RELATED_SOURCES = 4
 
 
 def write_json(path: Path, value: dict) -> None:
@@ -49,6 +50,22 @@ def clean_source(source: Path) -> None:
         raise ValueError('review requires a clean source checkout; preserve dirty work separately')
 
 
+def related_snapshots(source: Path, directory: Path, paths: list[str]) -> list[dict]:
+    if len(paths) > MAX_RELATED_SOURCES:
+        raise ValueError(f'at most {MAX_RELATED_SOURCES} related sources are supported')
+    roots = [source]
+    snapshots = []
+    for value in paths:
+        related = Path(value).resolve()
+        disjoint(related, directory)
+        if any(related == root or related in root.parents or root in related.parents for root in roots):
+            raise ValueError('related sources must be distinct, non-overlapping repository roots')
+        clean_source(related)
+        snapshots.append({'path': str(related), 'head': session.resolve_git_ref(str(related)), 'clean': True})
+        roots.append(related)
+    return snapshots
+
+
 def snapshot_current(directory: Path) -> None:
     current = session.load_session(directory)
     source = Path(session.repo_path(current)).resolve()
@@ -62,6 +79,18 @@ def snapshot_current(directory: Path) -> None:
         raise ValueError('review is stale: session snapshot differs from initialized source; create a new session')
     if session.resolve_git_ref(str(source), snapshot['baseInput']) != snapshot['base']:
         raise ValueError('review is stale: base ref changed; initialize a new snapshot')
+    for item in snapshot.get('relatedSources', []):
+        related = Path(item['path']).resolve()
+        if str(related) != item['path']:
+            raise ValueError('review is stale: related source path changed; initialize a new snapshot')
+        disjoint(related, directory.resolve())
+        try:
+            clean_source(related)
+            head = session.resolve_git_ref(str(related))
+        except (ValueError, RuntimeError, OSError) as error:
+            raise ValueError(f'review is stale: related source changed or unavailable: {related}: {error}') from error
+        if head != item['head']:
+            raise ValueError(f'review is stale: related source HEAD changed: {related}; initialize a new snapshot')
 
 
 def initialize(args) -> Path:
@@ -73,6 +102,7 @@ def initialize(args) -> Path:
     clean_source(source)
     if directory.exists():
         raise ValueError('session path already exists; choose a new path or resume with run')
+    related = related_snapshots(source, directory, getattr(args, 'related_source', None) or [])
     base = session.resolve_git_ref(str(source), args.base)
     head = session.resolve_git_ref(str(source))
     merge_base = git(source, 'merge-base', base, head)
@@ -102,19 +132,36 @@ def initialize(args) -> Path:
         'safeLocal': True, 'limits': {**local_policy.DEFAULT_LIMITS, 'maxSeconds': args.max_seconds}})
     write_json(local_policy.policy_directory(directory) / 'workspace-snapshot.json', {
         'baseInput': args.base, 'base': base, 'mergeBase': merge_base, 'head': head,
-        'personas': roles, 'model': args.model, 'reasoningEffort': args.effort})
+        'personas': roles, 'model': args.model, 'reasoningEffort': args.effort,
+        'relatedSources': related, 'coverage_contract': 1})
     appendix = ('\n\n# Workspace review contract\n'
                 'Use the following local review guidance for evidence, severity, and final comment style. '
                 'Keep public findings grounded in public source evidence. Never publish remotely. '
                 'Keep source read-only; record findings and verification limits in this session.\n'
                 + '\n'.join(f'- Read {shlex.quote(str(WORKSPACE_ROOT / p))}' for p in (
                     'reviews/REVIEW_GUIDELINES.md',
-                    'skills/review-panel/references/worker-contract.md')) + '\n')
+                    'skills/review-panel/references/worker-contract.md')) + '\n'
+                'For changed contracts or broad mechanical edits, read the relevant probes in '
+                + shlex.quote(str(WORKSPACE_ROOT / 'skills/review-panel/references/regression-probes.md'))
+                + '. Apply only reachable scenarios; record distinguishing evidence and '
+                'compatible controls, not a checklist of speculative findings.\n')
+    if related:
+        manifest = local_policy.policy_directory(directory) / 'workspace-snapshot.json'
+        appendix += ('\n# Related source inputs\n'
+                     'Read the pinned primary and related repository inputs in '
+                     + shlex.quote(str(manifest)) + '. These are local, read-only inputs, '
+                     'not findings or proof that the changes work together. Inspect the related '
+                     'source at its recorded HEAD where it produces or consumes an interface changed '
+                     'by this review. Check combined compatibility as well as each change alone; '
+                     'do not assume a textually clean merge establishes semantic compatibility. '
+                     'Do not edit any source or Git refs, fetch, publish, or expand to unrelated repositories. '
+                     'Record which interactions were exercised and any remaining evidence gaps.\n')
     templates = directory / 'templates'
     templates.mkdir()
     for name in ('agent-prompt.md', 'curator-prompt.md'):
         original = TOOL_ROOT / 'peanut_review/templates' / name
         (templates / name).write_text(original.read_text() + appendix)
+    review_coverage.configure(directory, has_related=bool(related))
     snapshot_current(directory)
     return directory
 
@@ -204,9 +251,11 @@ def run_review(args) -> Path | None:
                 launch.launch_curator(directory, template_path=directory / 'templates/curator-prompt.md')
             wait_completed(directory, [coordinator.name], deadline_for(directory))
             snapshot_current(directory)
-            report = export_result(directory)
+            assessment = review_coverage.assess(directory, current)
+            report = export_result(directory, assessment=assessment)
             write_json(directory / 'workspace-result.json', {'status': 'complete', 'report': str(report),
-                       'head': current.current_head, 'completedAt': datetime.now(timezone.utc).isoformat()})
+                       'head': current.current_head, 'recommendation': assessment['recommendation'],
+                       'materialGaps': assessment['gaps'], 'completedAt': datetime.now(timezone.utc).isoformat()})
             return report
         except (Exception, KeyboardInterrupt):
             agent_control.kill_agents(directory)
@@ -214,12 +263,23 @@ def run_review(args) -> Path | None:
             raise
 
 
-def export_result(directory: Path) -> Path:
+def export_result(directory: Path, assessment: dict | None = None) -> Path:
     current = session.load_session(directory)
+    assessment = assessment if assessment is not None else review_coverage.assess(directory, current)
     comments = [c for c in store.read_all_comments(directory) if not c.deleted]
-    lines = ['# Curated local review', '', f'Head: `{current.current_head}`', '',
-             'Reviewers and curator completed. Human review is required before publication.', '']
+    lines = ['# Curated local review', '', f'Head: `{current.current_head}`', '']
+    if assessment['recommendation'] is not None:
+        lines.extend([f'Recommendation: **{assessment["recommendation"]}**', ''])
+    lines.extend(['Reviewers and curator completed. Human review is required before publication.', ''])
+    if assessment['gaps']:
+        lines.extend(['## Material evidence gaps', ''])
+        lines.extend('- ' + str(gap) for gap in assessment['gaps'])
+        lines.append('')
     for comment in comments:
+        if (assessment['recommendation'] not in {None, 'approve'} and not comment.file
+                and (comment.category == 'approve' or
+                     comment.body.strip().lower() in {'lgtm', 'lgtm.', 'approved', 'approved.'})):
+            continue
         if comment.file:
             lines.extend([f'{comment.file}:{comment.line}' +
                           (f'-{comment.end_line}' if comment.end_line else ''), ''])
@@ -267,7 +327,10 @@ def status(directory: Path) -> None:
         freshness = str(error)
     overall = ('stale' if freshness != 'current' else
                'complete' if rows and all(row['complete'] for row in rows) else 'incomplete')
+    assessment = (review_coverage.assess(directory, current) if overall == 'complete' else
+                  {'recommendation': None, 'gaps': []})
     print(json.dumps({'status': overall, 'head': current.current_head, 'snapshot': freshness, 'agents': rows,
+                      'recommendation': assessment['recommendation'], 'materialGaps': assessment['gaps'],
                       'report': str(directory / 'result.md') if (directory / 'result.md').exists() else None}, indent=2))
 
 
@@ -277,6 +340,8 @@ def parser() -> argparse.ArgumentParser:
     commands.add_parser('doctor')
     create = commands.add_parser('init', help='create a pinned session without launching workers')
     create.add_argument('--source', required=True)
+    create.add_argument('--related-source', action='append', default=[],
+                        help='Clean local companion repository snapshot; repeat up to four times')
     create.add_argument('--base', required=True)
     create.add_argument('--model', required=True)
     create.add_argument('--effort', required=True)

@@ -17,6 +17,25 @@ Investigate the changed path end to end:
   imports reached through local helpers?
 - Can concurrent runs, retries, cache reuse or partial failures change the
   outcome? Follow artifact names, keys and completion conditions.
+- For a tooling cutover, trace the revisions actually executed by existing
+  callers. Check whether landing this PR first requires an interface available
+  only in an unmerged companion; testing the combined stack does not establish
+  that either intermediate deployment works.
+- For empty-work gates, check false, true and explicitly selected historical
+  inputs. A bypass before validation must not turn malformed or missing input
+  into an empty success; a moving default must not suppress an explicit backfill.
+- Follow credential scope through setup and dependency installation, not only
+  the command that uses the secret. Prefer the narrow consuming step when other
+  steps execute third-party installation code with no need for that credential.
+- When a selector or shared constant changes, trace selective path filters and
+  gate triggers as consumers too. A helper-only change must reach the validation
+  that protects its resulting platform or publication selection.
+- When extracting a job, compare the old effective environment and call chain
+  with the new one: retry ownership/window, credentials, working directory,
+  permission boundaries and parent lock lifetime. Follow reusable calls through
+  completion; moving work after publication can still hold its caller's lock.
+- Trace validation to the first durable mutation. A later build validation does
+  not prevent invalid input from consuming a reservation in an earlier job.
 
 Use actual callers and consumers, the repository's workflow conventions, and
 relevant PR/baseline CI as evidence. Compare equivalent configurations; a
