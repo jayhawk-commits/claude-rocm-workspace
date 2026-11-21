@@ -55,6 +55,13 @@ existing bugs, optional improvements and follow-up work; do not invent nits,
 agreement, authorship or prior discussions. Record severity, evidence gaps and
 disagreements in the curation report for the coordinating agent's final review.
 Completion signals alone do not establish review quality or source freshness.
+Before approval, reconcile the changed state predicates against each reviewer's
+temporal coverage: successive observations, committed effects with failed
+acknowledgements, bounded searches and cache epochs. A passing isolated-state
+test or closure of earlier comments is not coverage of these transitions.
+Inspect deleted findings too: if reviewers each deleted a duplicate in favor
+of the other, restore one supported finding. A duplicate must have a surviving
+canonical comment; record the survivor ID or the evidence for rejecting both.
 
 Curate local reviewer comments from the configured reviewer agents. Treat
 visible, resolved, deleted, and imported GitHub comments as duplicate history

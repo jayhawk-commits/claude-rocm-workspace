@@ -217,9 +217,22 @@ def test_regression_guidance_reaches_reviewers_and_curator(source, tmp_path, rol
         template = (directory / 'templates' / name).read_text()
         assert str(guide) in template
         assert 'Apply only reachable scenarios' in template
+        assert 'temporal_contracts' in template
+        assert 'ambiguous_effect' in template
+        assert 'independent oracle' in template
     for agent in session.load_session(directory).agents[:2]:
         copied = directory / 'personas' / agent.persona
         assert copied.read_text() == (profile.PERSONAS / agent.persona).read_text()
+
+
+def test_active_templates_preserve_concurrent_findings_and_review_remaining_boundaries():
+    templates = profile.TOOL_ROOT / 'peanut_review/templates'
+    reviewer = (templates / 'agent-prompt.md').read_text()
+    curator_text = (templates / 'curator-prompt.md').read_text()
+    assert 'Do not delete your initial finding' in reviewer
+    assert 'continue the other applicable boundary checks' in reviewer
+    assert 'not a full review of the corrected contract' in reviewer
+    assert 'surviving\ncanonical comment' in curator_text
 
 
 def test_init_rejects_dirty_source_and_overlapping_session(source):

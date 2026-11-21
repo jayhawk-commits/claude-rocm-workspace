@@ -31,6 +31,14 @@ Examine what the available evidence actually establishes:
   metadata/identity calculation and its consumer's validator, run one real
   producer-to-consumer path for that changed contract. Mocks for storage or
   transport can remain; preserve the validation whose compatibility is at issue.
+- For stateful decisions, test sequences across two or more reads, not only
+  separately constructed snapshots. Include unknown becoming an excluded final
+  state, a committed write followed by failure, and classification/search across
+  both count and page limits when reached. Use durable consumer behavior as the
+  oracle; a fixture that assumes failure means no write can certify the bug.
+- Check attempt/revision identity when caching completed details. Keep a valid
+  compatible control, account for applicable temporal scenarios in coverage,
+  and continue remaining boundary checks after the first finding.
 - Check fixture shape against the production branches it activates: legacy
   records without explicit outputs or fingerprints cannot prove modern-history
   compatibility. Follow all validators reached after the initially tested helper.

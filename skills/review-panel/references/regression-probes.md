@@ -25,6 +25,10 @@ caller, distinguish the base, and retain a compatible negative control.
 | Bounded maintenance | Test a backlog at the limit and above it across successive invocations. A cap should preserve the documented progress policy, not silently prevent all cleanup forever; retain per-operation authority checks and protected records. |
 | Credential interface compatibility | Use distinct synthetic values when both old and new secret names are supplied, then test each name alone and neither. Follow actual historical helpers and reusable declarations; equal fixtures can hide accidental aliasing. Require fallback only where the supported caller contract promises it. |
 | Per-output completion and downstream jobs | Establish whether publication is atomic or independent per output. For independent outputs, test mixed success, failure, skipped builds, invalid or unreadable receipts, all-complete retry and cancellation. Follow implicit job-success gating as well as explicit conditions, preserve failure visibility, and verify completion before expensive work. Do not invent a partial-publication policy. |
+| State inferred from observations | Replay at least two reads: queued/unknown, then preview/empty/final; let an unrelated operation finish before the intended one becomes visible. Unknown is not proof of a negative classification. Follow classification into pending-hold removal and retry selection, not only the classifier's return value. |
+| Ambiguous write outcome | Persist an identity or counter, then fail, cancel or lose the acknowledgement before the operation reports success. Feed the real durable state to the real retry consumer. A failed step does not prove no allocation exists; also retain a genuinely rejected-before-write control. |
+| Classified and paginated search | Put only excluded records before the wanted record, both at cap-plus-one and across a page boundary. An early-stop predicate must use the same classification as the final selector. Exhaustion must report an incomplete decision rather than silently masquerading as absence or a different read failure. |
+| Cache and attempt identity | Change the execution attempt or revision between listing and detail reads. Check empty and transient detail results before caching them as final; distinguish a completed summary from complete evidence for the same attempt. Preserve valid immutable-result reuse. |
 
 Record the probe and the consumer it covers in a session note, including any
 missing prerequisites. A source inspection or a synthetic probe can establish a
@@ -39,3 +43,8 @@ Name a specific missing contract when marking material evidence unverified.
 Lack of live service access does not prevent inspecting retry inheritance,
 checkout paths or lock scope in source; keep those checks separate from live
 qualification outside the review scope.
+
+New sessions record these stateful checks under temporal_contracts, with a
+sequence and independent oracle for each applicable scenario. Review the
+remaining changed invariants after finding an issue. On a re-review, distinguish
+known-comment closure, newly introduced assumptions and same-head misses.

@@ -100,3 +100,84 @@ def test_confirmed_finding_survives_other_coverage_gaps(review):
 
 def test_legacy_sessions_are_not_retroactively_relabelled(tmp_path):
     assert coverage.assess(tmp_path, SimpleNamespace()) == {'recommendation': None, 'gaps': []}
+
+
+def temporal_review(review):
+    root, current = review
+    (root / coverage.CONTRACT).write_text(json.dumps({
+        'version': 2, 'has_related': False, 'areas': coverage.AREAS,
+        'temporal_cases': coverage.TEMPORAL_CASES}))
+    for agent in current.agents:
+        def populate(record):
+            area = next(a for a in record['areas'] if a['id'] == 'temporal_contracts')
+            area['scenarios'] = [dict(id=case, status='checked', material=True,
+                sequence=['observe pending operation', 'observe committed result after an error'],
+                oracle='Stored identity remains authoritative across the error.',
+                evidence='Ran the producer and then the consumer; the same identity was retained.')
+                for case in coverage.TEMPORAL_CASES]
+        change(review, populate, agent.name)
+    return root, current
+
+
+def edit_temporal(record, edit):
+    edit(next(a for a in record['areas'] if a['id'] == 'temporal_contracts'))
+
+
+def test_v2_requires_transition_evidence_not_just_checked_prose(review):
+    root, current = temporal_review(review)
+    assert coverage.assess(root, current)['recommendation'] == 'approve'
+    change(review, lambda r: edit_temporal(r, lambda a: a.pop('scenarios')))
+    result = coverage.assess(root, current)
+    assert result['recommendation'] == 'wait_for_evidence'
+    assert 'temporal scenarios' in result['gaps'][0]
+
+
+@pytest.mark.parametrize('edit', [
+    lambda a: a.update(scenarios=[]),
+    lambda a: a['scenarios'][0].update(sequence=['only one snapshot']),
+    lambda a: a['scenarios'][0].update(sequence=['', 'later']),
+    lambda a: a['scenarios'][0].update(oracle=''),
+    lambda a: a['scenarios'][0].update(evidence=''),
+    lambda a: a['scenarios'][0].update(material='true'),
+    lambda a: a['scenarios'][0].update(status='maybe'),
+    lambda a: a['scenarios'].__setitem__(1, a['scenarios'][0]),
+    lambda a: [s.update(status='not_applicable') for s in a['scenarios']],
+])
+def test_v2_incomplete_or_self_describing_scenario_cannot_approve(review, edit):
+    temporal_review(review)
+    change(review, lambda r: edit_temporal(r, edit))
+    assert coverage.assess(*review)['recommendation'] == 'wait_for_evidence'
+
+
+def test_v2_material_ambiguity_survives_curator_approval(review):
+    temporal_review(review)
+    change(review, lambda r: edit_temporal(r, lambda a: a['scenarios'][1].update(
+        status='unverified', evidence='Write acknowledgement lost; durable consumer not checked.')))
+    result = coverage.assess(*review)
+    assert result['recommendation'] == 'wait_for_evidence'
+    assert 'ambiguous_effect remains materially unverified' in result['gaps'][0]
+
+
+def test_v2_static_changes_need_a_reason_not_irrelevant_temporal_tests(review):
+    temporal_review(review)
+    for agent in review[1].agents:
+        change(review, lambda r: edit_temporal(r, lambda a: a.update(
+            status='not_applicable', material=False,
+            evidence='Only a static display string changes; there is no stateful decision.')), agent.name)
+    assert coverage.assess(*review)['recommendation'] == 'approve'
+
+
+def test_existing_v1_six_area_contract_keeps_its_original_provenance(review):
+    root, current = review
+    original = {key: value for key, value in coverage.AREAS.items() if key != 'temporal_contracts'}
+    (root / coverage.CONTRACT).write_text(json.dumps({'version': 1, 'has_related': False, 'areas': original}))
+    for agent in current.agents:
+        change(review, lambda r: r.update(areas=[a for a in r['areas'] if a['id'] in original]), agent.name)
+    assert coverage.assess(root, current)['recommendation'] == 'approve'
+
+
+def test_v2_scenario_inventory_is_pinned_for_existing_sessions(review, monkeypatch):
+    temporal_review(review)
+    monkeypatch.setattr(coverage, 'TEMPORAL_CASES', {**coverage.TEMPORAL_CASES,
+        'future_probe': 'A future runtime may ask new sessions for more evidence.'})
+    assert coverage.assess(*review)['recommendation'] == 'approve'

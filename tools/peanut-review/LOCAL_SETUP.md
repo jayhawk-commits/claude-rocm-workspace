@@ -140,6 +140,21 @@ exported `recommendation` may be `wait_for_evidence` or `request_changes`.
 Coverage is reviewer-attested and cannot guarantee correctness. Existing
 sessions retain their original provenance and are not retroactively regraded.
 
+Version 2 coverage adds `temporal_contracts`. Static changes may mark it
+inapplicable with a reason. Stateful changes must account for observation
+sequences, ambiguous committed effects, classified search exhaustion, cache
+epochs and a compatible control. Checked scenarios need successive events,
+an independent oracle and concrete evidence; missing or materially unverified
+scenarios withhold approval. This strengthens evidence accounting, not a
+guarantee that every defect will be found. The reviewer pass covers all reached
+boundaries within its bounds rather than stopping at one finding or only
+closing prior comments. Concurrent duplicate consolidation belongs to curator.
+
+Generate a fictional stateful replay with `review_quality_fixture.py --scenario
+temporal --output <new-directory>`. Keep evaluation expectations outside the
+reviewed checkout. The replay combines multiple defects and compatible controls
+in one head; it is a regression check, not a general detection-rate estimate.
+
 The integration replay can be generated with:
 
 ```sh

@@ -8,6 +8,13 @@ Follow a representative value from creation to use:
 
 - Which producer writes each field, and which readers interpret it? Check
   validators, tooling, installation paths and downstream defaults.
+- Trace authority across partial success: persist the record/counter, then
+  fail before the step reports success. A failed or cancelled step is not proof
+  of an absent reservation. Check real recovery and supersession consumers.
+- Carry uncertain observations through classification, holds, search and retry
+  decisions. Unknown is not a confirmed exclusion; a classification-sensitive
+  selector cannot use a weaker pagination stopping rule. Test the wanted
+  record beyond excluded records and at each applicable bound.
 - Do identifiers, versions, platform names and package formats retain their
   meaning across conversion and serialization? Look for silently dropped or
   reinterpreted values.

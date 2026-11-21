@@ -78,6 +78,11 @@ Read only the selected references:
    unchanged code can retain untested assumptions or gain new consumers from a
    base refresh. For optional backends or migrations, state evidence by mode
    and transition; a successful default-mode run does not certify activation.
+   For stateful changes, inventory the changed invariants and cover sequences
+   of observations, ambiguous durable effects, classified search limits and
+   cache epochs before completing the pass. Continue the applicable inventory
+   after finding a defect. Record these under temporal_contracts; a fix's new
+   assumptions need review in addition to closing the earlier comment.
 4. Verify the snapshot again and, for a PR, re-fetch its head/base metadata
    before preparing current inline anchors. If it changed, mark results stale;
    re-review the affected scope within the remaining bounds or report that

@@ -389,13 +389,133 @@ def create_lifecycle(output: Path):
     return _create(output, LIFECYCLE_BASE, lifecycle_candidate_sources())
 
 
+TEMPORAL_BASE = {
+    'README.md': '''# Batch service
+
+Workers submit tickets independently per lane. Until a newly submitted work
+ticket is positively identified, its lease prevents another submission; a
+preview or an unclassified observation cannot confirm that submission.
+Preview tickets never supersede work. History search must find the newest work
+ticket past previews; its page bound returns complete=False when exhausted.
+An acknowledgement can fail after a reservation is durable. The ledger then
+remains authoritative and its current ticket is recoverable. Cache entries
+belong to an execution attempt, not merely the execution ID. Empty selections,
+confirmed previews and immutable details from the same attempt are supported.
+''',
+    'observations.py': '''"""Manage leases while the worker listing catches up."""
+
+
+def observe(leases, lane, rows):
+    known = leases.get(lane)
+    if known is not None and any(row["kind"] == "work" and row["id"] not in known for row in rows):
+        del leases[lane]
+
+
+def can_submit(leases, lane, rows):
+    return lane not in leases and all(row["status"] == "done" for row in rows)
+''',
+    'history.py': '''"""Select a work ticket after excluding previews and confirmed unused tickets."""
+
+
+def newest(entries, classify):
+    for entry in entries:
+        if classify(entry) not in {"preview", "unused"}:
+            return entry
+    return None
+''',
+    'paging.py': '''"""Fetch newest-first batches from the shared worker listing."""
+
+
+def gather(fetch, lane, classify, page_size=4, max_pages=3):
+    selected = []
+    for page in range(1, max_pages + 1):
+        rows = fetch(page)
+        selected.extend(row for row in rows if row["lane"] == lane)
+        has_request = any(classify(row) == "work" for row in selected)
+        if len(rows) < page_size or (has_request and rows[-1]["old"]):
+            return selected, True
+    return selected, False
+''',
+    'authority.py': '''"""Classify worker reports against authoritative reservation data."""
+
+
+def classify(report, ledger):
+    if report.get("preview"):
+        return "preview"
+    if ledger["head"] == report["id"]:
+        return "work"
+    if report.get("write_failed"):
+        return "unknown"
+    return "unused" if report.get("absence_confirmed") else "unknown"
+''',
+    'ledger.py': '''"""A reservation remains durable when later housekeeping fails."""
+
+
+def reserve(ledger, ticket, after_write):
+    ledger["head"] = ticket
+    ledger["items"].add(ticket)
+    after_write()
+    return ticket
+
+
+def resume(ledger, ticket):
+    if ledger["head"] != ticket:
+        raise ValueError("ticket superseded")
+    return ticket
+''',
+    'submit.py': '''"""Only one unacknowledged submission per lane."""
+
+
+async def submit(leases, lane, send, known_ids):
+    if lane in leases:
+        return False
+    leases[lane] = set(known_ids)
+    await send()
+    return True
+''',
+    'details.py': '''"""Completed details are reusable only for the same observed attempt."""
+
+
+def details(cache, execution, attempt, fetch):
+    key = (execution, attempt)
+    if key in cache:
+        return cache[key]
+    result = fetch(execution, attempt)
+    if result and all(item["attempt"] == attempt and item["done"] for item in result):
+        cache[key] = result
+    return result
+''',
+}
+
+
+def temporal_candidate_sources():
+    files = dict(TEMPORAL_BASE)
+    files['observations.py'] = files['observations.py'].replace(
+        'row["kind"] == "work"', 'row["kind"] != "preview"')
+    files['history.py'] = files['history.py'].replace('for entry in entries:', 'for entry in entries[:3]:')
+    files['paging.py'] = files['paging.py'].replace(
+        'any(classify(row) == "work" for row in selected)', 'bool(selected)')
+    files['authority.py'] = files['authority.py'].replace(
+        '    if ledger["head"] == report["id"]:\n',
+        '    if report.get("write_failed"):\n        return "unused"\n'
+        '    if ledger["head"] == report["id"]:\n')
+    files['submit.py'] = files['submit.py'].replace(
+        '    leases[lane] = set(known_ids)\n    await send()\n',
+        '    await send()\n    leases[lane] = set(known_ids)\n')
+    return files
+
+
+def create_temporal(output: Path):
+    return _create(output, TEMPORAL_BASE, temporal_candidate_sources())
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True, help='New repository directory')
-    parser.add_argument('--scenario', choices=('history', 'integration', 'lifecycle'), default='history')
+    parser.add_argument('--scenario', choices=('history', 'integration', 'lifecycle', 'temporal'), default='history')
     args = parser.parse_args()
     create_fixture = {'history': create, 'integration': create_integration,
-                      'lifecycle': create_lifecycle}[args.scenario]
+                      'lifecycle': create_lifecycle, 'temporal': create_temporal}[args.scenario]
     print(json.dumps(create_fixture(args.output), indent=2))
 
 

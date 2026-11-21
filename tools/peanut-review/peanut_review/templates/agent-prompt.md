@@ -85,6 +85,18 @@ ${PR_BIN} --session ${SESSION} comments --format json
 
 Another reviewer may have posted concurrently. The presence of comments alone
 does not mean this is a follow-up pass; do not let them seed your initial review.
+Do not delete your initial finding merely because another reviewer posted a
+duplicate. Leave concurrent duplicate consolidation to the curator; otherwise
+both reviewers can delete the only surviving evidence in favor of each other.
+
+For stateful changes, inventory the changed predicates and the invariants they
+protect before testing. Exercise successive observations, a durable effect
+followed by failure, classification across page and count limits, and cache
+attempt/revision changes wherever reached. Trace the same value through the
+production decision and its actual consumer; expected values copied from the
+decision itself are not an independent oracle. Keep a compatible control.
+After finding a defect, continue the other applicable boundary checks within
+the review budget rather than stopping at the first plausible finding.
 
 If the orchestrator reran you after fixes or rebuttals, read all prior context
 before finalizing your follow-up conclusions:
@@ -96,6 +108,11 @@ before finalizing your follow-up conclusions:
 3. **Fix diff** (what the orchestrator changed in response to prior findings):
    `git -C ${REPO_PATH} log --oneline -5` to find the fix commit, then
    `git -C ${REPO_PATH} diff <original-head>..<fix-commit>` to see the actual fixes.
+
+Closing those comments is not a full review of the corrected contract. Check
+the new assumptions introduced by each fix and carry them through selection,
+pending holds, retries, persistent state, search limits and caches as applicable.
+Separate defects introduced by the fix from earlier same-head misses.
 
 For each previously resolved finding, assess whether its fix or rebuttal still
 holds on the current diff. If the concern still applies and the original
